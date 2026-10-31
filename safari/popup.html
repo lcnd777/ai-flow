@@ -2,26 +2,28 @@
 <body class="popup">
   <main>
     <header class="top">
-      <div class="brand"><span class="brand-symbol">◉</span><div><div class="brand-name">AI Flow</div><div class="sub">Usage Monitor <span class="version">BÊTA 0.6.4</span></div></div></div>
-      <div class="top-right"><span id="health-dot" class="tiny-dot"></span><span id="health-label" class="muted">Données locales</span></div>
+      <div class="brand"><span class="brand-symbol">◉</span><div><div class="brand-name">AI Flow</div><div class="sub">Usage Monitor <span class="version">BÊTA 0.7.0</span></div></div></div>
+      <div class="top-right"><span id="health-dot" class="tiny-dot"></span><span id="health-label" class="muted">En attente</span></div>
     </header>
     <div class="title-row"><div><div class="eyebrow">TABLEAU DE BORD</div><h1>Garde ton flow.</h1><p class="subtitle">Tes limites, sans interruption.</p></div><span class="decor">↗</span></div>
-    <div class="quick-actions"><button id="open-full" class="primary quick-dashboard" type="button">Ouvrir le tableau de bord en grand <span>↗</span></button><button id="quick-claude" class="secondary quick-claude" type="button">Vérifier quotas Claude</button><p class="subtitle" id="quick-notice" role="status"></p></div>
+    <div class="quick-actions"><button id="open-full" class="primary quick-dashboard" type="button">Ouvrir le tableau de bord en grand <span>↗</span></button></div>
+
     <div id="provider-cards" class="cards"></div>
-    <section class="panel connection-panel" aria-labelledby="connection-title"><div class="connection-heading"><h2 id="connection-title">Mes comptes</h2><span class="tag subtle">Connexion officielle</span></div>
-      <p class="subtitle">Ouvre Claude ou ChatGPT dans Safari. Connecte-toi sur leur site officiel si nécessaire ; AI Flow ne demande aucun mot de passe et ne conserve pas les jetons de connexion.</p>
+
+    <section class="panel connection-panel" aria-labelledby="connection-title">
+      <div class="connection-heading"><h2 id="connection-title">Mes comptes</h2><span class="tag subtle">Mise à jour auto</span></div>
+      <p class="subtitle">Les quotas se mettent à jour tout seuls dès qu’un onglet Claude ou ChatGPT est ouvert dans Safari et que tu y es connecté. AI Flow ne demande aucun mot de passe.</p>
       <div id="account-connections" aria-live="polite"></div>
       <p id="connection-notice" class="notice" role="status"></p>
-      <p class="subtitle">Site ouvert ≠ quotas accessibles. Une connexion n'est confirmée pour le suivi qu'après lecture effective d'un quota.</p>
     </section>
-    <section class="panel connector-panel"><h2>Suivi automatique</h2><p class="subtitle">Après ouverture du compte sur son site officiel, active le relevé. La collecte reste expérimentale : un quota absent demeure indisponible.</p>
-      <div id="connectors"></div><button id="refresh" class="secondary">Actualiser le suivi</button><p id="connector-notice" class="notice" role="status"></p><p id="diagnostics" class="subtitle" role="status">Claude : aucun test effectué.</p>
-      <p class="subtitle">Safari peut suspendre les extensions en arrière-plan. Une donnée ancienne sera marquée indisponible. Aucun cookie ni texte des conversations n’est enregistré par AI Flow. Les endpoints Claude sont internes, non documentés et susceptibles de changer.</p>
+
+    <div class="section-head"><h2>Continuité du travail</h2><span class="tag">Relance</span></div>
+    <section class="panel continuity-panel">
+      <div class="setting-line inline-first"><div><b>Relance après quota</b><span>Active la relance programmée dans la pastille AI Flow. Sur Claude, une fenêtre la propose dès que le quota est atteint ; sur ChatGPT, tu choisis l’heure.</span></div><label class="switch"><input type="checkbox" id="resume-toggle" aria-label="Relance après quota"><span></span></label></div>
+      <div id="resume-list" aria-live="polite"></div>
+      <p class="subtitle small">L’envoi se fait depuis ton compte, une seule fois, et reste annulable. Anthropic et OpenAI encadrent l’usage de scripts sur leurs sites : à utiliser en connaissance de cause.</p>
+      <div class="quick-links"><a href="transfer.html" target="_blank">Transférer vers l’autre IA ↗</a></div>
     </section>
-    <details class="panel mobile-setup"><summary>Premiers pas · Safari iPhone / iPad</summary>
-      <ol><li>Installe l’application AI Flow via TestFlight, puis active son extension dans les réglages des extensions Safari.</li><li>Dans Safari, ouvre claude.ai ou chatgpt.com. Dans le menu de la page, autorise AI Flow sur ces sites seulement.</li><li>Vérifie que la pastille AI Flow apparaît. Ouvre ce tableau de bord et active le suivi de la plateforme.</li><li>Connecte-toi sur la page officielle si nécessaire. Une valeur « Observé » confirme une lecture reconnue ; « Indisponible » ne signifie jamais 0 %.</li></ol>
-      <p class="subtitle">Après une suspension, rouvre l’onglet officiel et recharge-le si les données sont anciennes. Safari peut suspendre le suivi en arrière-plan. Le widget fonctionne sur les sites Safari, pas dans les applications natives ChatGPT ou Claude. Les intitulés des menus varient selon iOS.</p>
-    </details>
 
     <div class="section-head"><h2>Prévoir ma session</h2><span class="tag">AI Runway</span></div>
     <section class="panel">
@@ -29,17 +31,13 @@
       <div id="runway" class="advice"><span class="advice-icon">✦</span><p>Les prévisions apparaîtront après plusieurs relevés.</p></div>
       <div class="setting-line inline-setting"><div><b>Réserve de sécurité</b><span>Préserver une partie de ton quota</span></div><select id="reserve" aria-label="Réserve de quota"><option value="0">Aucune</option><option value="10">10 %</option><option value="15">15 %</option><option value="20">20 %</option><option value="30">30 %</option><option value="40">40 %</option><option value="50">50 %</option></select></div>
     </section>
-    <div class="section-head"><h2>Saisir un relevé</h2><span class="tag subtle">Manuel · secours</span></div>
-    <section class="panel form-panel">
-      <label for="metric-id">Quota</label><select id="metric-id"><option value="claude.session">Claude — Session 5 h</option><option value="claude.weekly">Claude — Hebdomadaire</option><option value="chatgpt.thinking">ChatGPT — Thinking</option></select>
-      <div class="two-cols"><div><label for="percent">Utilisation (%)</label><input type="number" id="percent" min="0" max="100" step="0.1" placeholder="Ex. 68" /></div><div><label for="reset">Reset (facultatif)</label><input type="datetime-local" id="reset" /></div></div>
-      <button id="save" class="primary">Enregistrer le relevé <span>↗</span></button><div id="form-status" role="status" class="notice"></div>
-    </section>
-    <section class="panel switch-panel">
-      <div class="row split"><div><b>Continuité du travail</b><p class="subtitle">Besoin de changer d'IA ? Ouvre l'autre plateforme en un clic, sans lecture de conversation.</p></div><span class="tag subtle">Smart Switch · base</span></div>
-      <p><a href="transfer.html" target="_blank">Préparer un transfert de conversation ↗</a></p><div class="quick-links"><a href="https://chatgpt.com/" target="_blank" rel="noreferrer">Ouvrir ChatGPT ↗</a><a href="https://claude.ai/" target="_blank" rel="noreferrer">Ouvrir Claude ↗</a></div>
-    </section>
-    <div class="setting-line"><div><b>Flow Guardian</b><span>Masquer les chiffres tant que tout va bien</span></div><label class="switch"><input type="checkbox" id="focus-toggle" aria-label="Flow Guardian"><span></span></label></div>
+
+    <div class="setting-line"><div><b>Flow Guardian</b><span>Sur Claude et ChatGPT, la pastille AI Flow affiche « Pas d’alerte » au lieu des pourcentages tant que tout va bien.</span></div><label class="switch"><input type="checkbox" id="focus-toggle" aria-label="Flow Guardian"><span></span></label></div>
+
+    <details class="panel mobile-setup"><summary>Premiers pas</summary>
+      <ol><li>Dans Safari, autorise AI Flow sur claude.ai et chatgpt.com (menu de la page ou Réglages › Extensions).</li><li>Ouvre Claude ou ChatGPT et connecte-toi : la pastille AI Flow apparaît en bas à droite.</li><li>Les quotas s’affichent ici en quelques secondes, puis se mettent à jour tout seuls.</li></ol>
+      <p class="subtitle">« Indisponible » ne signifie jamais 0 % : la valeur n’a simplement pas pu être lue. Safari peut suspendre l’extension en arrière-plan ; revenir sur l’onglet relance la lecture.</p>
+    </details>
     <footer><a href="https://claude.ai/settings/usage" target="_blank" rel="noreferrer">Usage Claude ↗</a><a href="popup.html" target="_blank">Tableau de bord ↗</a><a href="options.html" target="_blank">Paramètres ↗</a></footer>
   </main>
   <script src="shared.js"></script><script src="popup.js"></script>

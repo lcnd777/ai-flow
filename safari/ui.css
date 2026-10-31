@@ -57,3 +57,23 @@ html.dashboard-full .subtitle{font-size:13px}
 .account-state{display:block;color:var(--muted);font-size:10px;line-height:1.5;margin-top:3px}
 .account-state.verified{color:var(--green)}.account-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
 .account-actions .secondary{padding:7px 8px;min-height:31px}.connection-panel .notice{margin-top:7px}
+
+/* 0.7.0 — logos, comptes fusionnés avec la mise à jour auto, relance programmée */
+.provider-icon svg{width:18px;height:18px;display:block}
+.provider-icon.claude{background:#3a2a24}
+.provider-icon.chatgpt{background:#1f2522;color:#f3f4ef}
+.provider-icon.mini{width:24px;height:24px;border-radius:7px;flex-shrink:0}
+.provider-icon.mini svg{width:14px;height:14px}
+.meter-meta .late{color:var(--orange)}
+.subtitle.small{font-size:10px;line-height:1.5;margin-top:8px}
+.account-id{display:flex;align-items:center;gap:9px;min-width:0}
+.account-actions{align-items:center}
+.account-state.warn{color:var(--orange)}
+.continuity-panel .inline-first{margin:0 0 4px}
+.continuity-panel .quick-links{margin-top:10px}
+.resume-items{display:grid;gap:8px;margin-top:10px}
+.resume-item{display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--edge);border-radius:9px;padding:8px 9px;font-size:11px}
+.resume-item>div{flex:1;min-width:0}
+.resume-item>div span{display:block;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.resume-item .secondary{min-height:28px;padding:5px 8px}
+@media(prefers-color-scheme:light){.provider-icon.claude{background:#f6e6dd}.provider-icon.chatgpt{background:#eef1ec;color:#111}}

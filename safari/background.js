@@ -157,6 +157,13 @@ async function autoRefresh(providers,force=false){
   }
   return out;
 }
+// Dashboard switch « Mise à jour automatique » for one provider.
+async function autoSet(provider,enabled){
+  if(!['claude','codex'].includes(provider))throw Error('Plateforme inconnue');
+  if(enabled){await setAutoDisabled(provider,false);await autoRefresh([provider],true);}
+  else await stopTracker(provider); // also marks the provider as disabled
+  return true;
+}
 async function setAutoDisabled(provider,value){
   const saved=(await api.storage.local.get(AUTO_KEY))[AUTO_KEY]||{};
   const disabled={...(saved.disabled||{})};if(value)disabled[provider]=true;else delete disabled[provider];
@@ -477,7 +484,8 @@ async function handle(message,sender){
   if(op==='trackerStop')return stopTracker(payload?.provider);
   if(op==='trackerStatus')return trackers();
   if(op==='diagnostics')return (await api.storage.local.get(DIAG_KEY))[DIAG_KEY]||{};
-  if(op==='refresh'){await pollTrackers();await autoRefresh(['claude','codex'],true);return true;}
+  if(op==='refresh'){await autoRefresh(['claude','codex'],true);return true;}
+  if(op==='autoSet')return autoSet(payload?.provider,payload?.enabled===true);
   if(op==='autoRefresh'){const p=payload?.provider;return autoRefresh(p?[p]:['claude','codex']);}
   if(op==='resumeArm')return resumeArm(payload,sender);
   if(op==='resumeCancel')return resumeCancel(String(payload?.id||''));
@@ -497,13 +505,9 @@ api.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message?.type!=='AI_FLOW')return false;
   serial(()=>handle(message,sender)).then(value=>reply({ok:true,value}),error=>reply({ok:false,error:error.message}));return true;
 });
-api.alarms.onAlarm.addListener(alarm=>alarm.name==='ai-flow-refresh'?serial(async()=>{
-  await pollTrackers();
-  // Providers without an explicit tracker are refreshed from any open tab.
-  const records=await trackers();
-  await autoRefresh(['claude','codex'].filter(p=>!records[p]));
-  await refresh();
-}):undefined);
+// 0.7.0: one automatic path for every provider (open tab, no click). The old
+// per-provider trackers (Vérifier / Activer) are no longer created.
+api.alarms.onAlarm.addListener(alarm=>alarm.name==='ai-flow-refresh'?serial(async()=>{await autoRefresh(['claude','codex']);await refresh();}):undefined);
 api.alarms.onAlarm.addListener(alarm=>{if(alarm.name.startsWith('ai-flow-resume:'))serial(()=>fireResume(alarm.name.slice('ai-flow-resume:'.length)));});
 api.tabs.onUpdated?.addListener((tabId,change,tab)=>{
   if(change.status!=='complete')return;
@@ -549,7 +553,11 @@ async function install(){
   await restoreResumeAlarms();
   await refresh();await syncMenu();
 }
-api.runtime.onInstalled.addListener(()=>serial(install));
+api.runtime.onInstalled.addListener(()=>serial(async()=>{
+  // Migration 0.7.0: drop legacy trackers (they could reload a user tab every few minutes).
+  await api.storage.local.set({[TRACKER_KEY]:{}});
+  await install();
+}));
 api.runtime.onStartup?.addListener(()=>serial(async()=>{
   // Never adopt a potentially reused tab ID after a browser restart.
   const records=await trackers();

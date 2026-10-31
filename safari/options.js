@@ -26,10 +26,10 @@
     try{const snapshot=A.menuSnapshot(await A.getState()),url=URL.createObjectURL(new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='AI-Flow-quotas.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);notice.textContent='Instantané exporté : à importer dans le menu Mac. Ce fichier ne se met pas à jour automatiquement.';}catch(e){notice.textContent=e.message;}
   });
   document.getElementById('clearData').addEventListener('click',async()=>{
-    if(!confirm('Supprimer tous les relevés et arrêter les onglets de suivi ?'))return;
+    if(!confirm('Supprimer tous les relevés enregistrés ?'))return;
     try{
-      await A.request('trackerStop',{provider:'claude'});await A.request('trackerStop',{provider:'codex'});
-      state=await A.clearReadings();notice.textContent='Relevés supprimés et suivi arrêté. Une page d’utilisation ouverte manuellement peut produire un nouveau relevé.';
+      // 0.7.0: clearing data no longer disables automatic updates (that switch lives in « Mes comptes »).
+      state=await A.clearReadings();notice.textContent='Relevés supprimés. Ils réapparaîtront à la prochaine lecture si un onglet Claude ou ChatGPT est ouvert.';
     }catch(e){notice.textContent=e.message;}
   });
 })();

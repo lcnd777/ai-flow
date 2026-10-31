@@ -1,3 +1,15 @@
+## 0.7.0 — Mise à jour automatique, relance après quota, fenêtre simplifiée
+
+- Quotas mis à jour sans clic : depuis tout onglet Claude / ChatGPT ouvert (toutes les 2 min, à l’ouverture de la fenêtre, au retour sur l’onglet). Aucun onglet n’est ouvert ni rechargé automatiquement.
+- La pastille relit le stockage toutes les 30 s (Safari ne transmet pas toujours `storage.onChanged`) : fin du « Indisponible » alors que la fenêtre affichait des valeurs.
+- « Mes comptes » et « Suivi automatique » fusionnés : une ligne par plateforme (état, Ouvrir, interrupteur de mise à jour auto). Boutons Vérifier / Activer / Arrêter supprimés ; anciens suivis par onglet nettoyés à la mise à jour.
+- Suppression de « Vérifier quotas Claude » et de la saisie manuelle de relevés.
+- « Observé · il y a X min » masqué tant que la donnée a moins de 5 min ; « Mis à jour il y a X min » en orange au-delà.
+- Logos Claude et ChatGPT.
+- Relance programmée (désactivée par défaut, réglage « Relance après quota ») : sur Claude, carte « Quota atteint » proposant de relancer la conversation à la réouverture de la session ; sur ChatGPT, heure choisie par l’utilisateur. Un seul envoi, annulable, jamais par-dessus un brouillon. Liste des relances dans la fenêtre.
+- Maintien du Mac éveillé et notification de fin via l’app Mac (`native/AIFlowKeepAwake.swift`, permission `nativeMessaging`).
+- Flow Guardian clarifié : il agit sur la pastille de Claude / ChatGPT.
+
 ## 0.6.4 — Connexion officielle et état de quota vérifié
 
 - Deux entrées "Ouvrir" vers les sites officiels Claude / ChatGPT, réutilisation d’un onglet existant sans le désépingler.
