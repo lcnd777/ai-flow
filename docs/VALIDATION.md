@@ -81,3 +81,10 @@ Sans app Mac, Safari ne répond jamais à un appel natif, ce que Chromium ne rep
 - Branches Codex `codex/sync-recovery-integrity` et `codex/platform-consumption-chart` intégrées après vérification.
 - Tests unitaires : 123/123. Chromium (sites simulés) : 84/84, dont les tests navigateur que l’environnement Codex n’avait pas pu lancer (infobulle multi-plateformes mise à jour, reprise d’un brouillon après une autre capture). Cycle de mise à jour : 14/14.
 - Non vérifié : Safari réel et sessions Claude / ChatGPT authentifiées.
+
+## Ajouts 0.14.0
+
+- Tests unitaires : 128/128 (dont 5 Git Handoff sur de vrais dépôts Git temporaires : publié, non poussé, local, branche non publiée, secrets, identifiants retirés, vérification refusée sur un autre clone sans le commit, exécution réelle de `--run`).
+- Chromium (sites simulés) : 85/85 avec les nouveaux libellés.
+- Passation réelle générée sur ce dépôt (`docs/handoff/LATEST.md`) et vérifiée avec `verify`.
+- Non vérifié : Safari réel, sessions authentifiées, reprise effective par Codex à partir de cette passation.

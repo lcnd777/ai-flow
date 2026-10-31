@@ -1,4 +1,4 @@
-# AI Flow — Usage Monitor 0.13.4 (bêta)
+# AI Flow — Usage Monitor 0.14.0 (bêta)
 
 **Never lose your flow to an AI limit.**
 
@@ -8,6 +8,7 @@ AI Flow est une extension Safari (Mac, iPhone, iPad), Chrome et Edge. Elle montr
 - **Installation** : [docs/INSTALLATION.md](docs/INSTALLATION.md). Sans Xcode : Safari (extension temporaire) ou Chrome / Edge. Awake : rattrapage au réveil par défaut, réveil programmé en option.
 - **Ce qui est vraiment mesuré** : [docs/QUOTAS.md](docs/QUOTAS.md)
 - **Smart Context Sync** (synchroniser les avancées entre Claude et ChatGPT) : [docs/SMART-CONTEXT-SYNC.md](docs/SMART-CONTEXT-SYNC.md)
+- **Dev Continuity** (passation Claude Code ↔ Codex via Git) : [docs/DEV-CONTINUITY.md](docs/DEV-CONTINUITY.md) · instructions agents : [AGENTS.md](AGENTS.md)
 - **Confidentialité** : [docs/PRIVACY.md](docs/PRIVACY.md)
 - **Tests et vérifications restantes** : [docs/VALIDATION.md](docs/VALIDATION.md)
 - **Nouveautés** : [CHANGELOG.md](CHANGELOG.md)

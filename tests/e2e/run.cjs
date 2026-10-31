@@ -171,7 +171,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   check('Notification « approche de sa limite » une seule fois',(toasts||[]).filter(t=>t.type==='approaching'&&t.platform==='claude').length===1,JSON.stringify(toasts));
   await pc.bringToFront();await pc.waitForTimeout(500);
   let w=await widget(pc);
-  check('Flow Recovery : suggestion discrète de point de reprise quand la limite approche',/Point de reprise/.test(text(w.html))&&/Enregistrer un point de reprise/.test(text(w.html)),text(w.html).slice(0,200));
+  check('Flow Recovery : suggestion discrète de point de reprise quand la limite approche',/Sauvegarder ton travail/.test(text(w.html))&&/Sauvegarder pour plus tard/.test(text(w.html)),text(w.html).slice(0,200));
   check('Pastille : bouton « Point de reprise » sur une conversation',/id="checkpoint"/.test(w.html));
   check('Pastille : Smart Switch dans la page',/Smart Switch/.test(text(w.html))||/approche de sa limite/.test(text(w.html)));
   await pc.screenshot({path:path.join(shots,'widget-toast.png')});

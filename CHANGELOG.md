@@ -1,3 +1,17 @@
+## 0.14.0 — Dev Continuity (Git Handoff v1) et parcours de continuité clarifiés
+
+### Dev Continuity
+- **Git Handoff v1** (`tools/handoff/`) : paquet de passation standardisé JSON + Markdown entre Claude Code, Codex et tout agent compatible. Relève l’état Git en lecture seule et distingue publié / commité non poussé / modifié localement / documenté / non vérifiable ; détecte les secrets sans les recopier ; enregistre le résultat réel des tests lancés (`--run`).
+- `verify` : l’agent qui reprend contrôle la passation contre le dépôt (Git = source de vérité) et refuse de reprendre si le commit n’existe pas.
+- `AGENTS.md` (Codex) et `CLAUDE.md` (Claude Code) : reprise et passation systématiques. Documentation : `docs/DEV-CONTINUITY.md` (format, sécurité, limites, architecture multi-fournisseurs).
+
+### Continuité plus claire
+- Trois actions distinctes partout : **Continuer sur ChatGPT / Claude** (poursuivre maintenant ailleurs), **Sauvegarder pour plus tard** (garder le contexte sans changer d’IA), **Synchroniser les avancées** (conversations déjà liées, prioritaire quand elles existent).
+- La page de sauvegarde s’intitule « Sauvegarder pour plus tard ».
+
+### GitHub
+- PR #2 (Codex) fermée : son contenu est dans `main` depuis la 0.13.1.
+
 ## 0.13.4 — Fenêtre AI Flow plus grande
 
 - Fenêtre AI Flow de Safari Mac plus large (460 px au lieu d’environ 260 px affichés) et plus haute (600 px), texte plus grand. Une règle prévue pour les petits écrans la rétrécissait par erreur ; elle ne s’applique plus qu’aux écrans tactiles (iPhone, iPad).

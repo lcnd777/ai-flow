@@ -160,8 +160,8 @@
     if(checkpoints.some(d=>d.url===url&&d.kind==='checkpoint'&&d.status!=='done'))return '';
     const m=state.metrics[st.worstId],key='cp|'+url+'|'+(m?.resetAt?Math.round(m.resetAt/600000):'x');
     if(dismissed[key])return '';
-    return `<div class="switch" data-cp-key="${esc(key)}"><b>Point de reprise</b><div class="tiny">${esc(name(main))} ${st.limitReached?'a atteint sa limite':'approche de sa limite'}. Enregistre où tu en es pour continuer plus tard ou sur une autre IA.</div>
-      <div class="acts"><button class="btn" id="cp-save">Enregistrer un point de reprise</button><button class="link" id="cp-later">Plus tard</button></div></div>`;
+    return `<div class="switch" data-cp-key="${esc(key)}"><b>Sauvegarder ton travail</b><div class="tiny">${esc(name(main))} ${st.limitReached?'a atteint sa limite':'approche de sa limite'}. Garde où tu en es pour reprendre plus tard, ici ou sur une autre IA.</div>
+      <div class="acts"><button class="btn" id="cp-save">Sauvegarder pour plus tard</button><button class="link" id="cp-later">Plus tard</button></div></div>`;
   }
   async function checkpointNow(){
     // Sur ce clic uniquement : lecture de la conversation ouverte, puis édition du point de reprise.
@@ -178,7 +178,7 @@
     return `<div class="switch"><b>Smart Switch</b><div class="tiny">${esc(name(main))} ${sw.pressured[0].limitReached?'a atteint sa limite':'approche de sa limite'}.</div>
       ${alts?`<div class="tiny" style="margin-top:6px">Capacité confirmée :</div>${alts}`:'<div class="tiny">Aucune autre plateforme avec une capacité confirmée.</div>'}
       ${unk.length?`<div class="tiny">État inconnu : ${esc(unk.join(', '))}.</div>`:''}${unm.length?`<div class="tiny">Non mesurées : ${esc(unm.join(', '))}.</div>`:''}
-      ${PL.transferable(location.href)?'<div class="acts"><button class="btn" id="handoff">Transférer le contexte</button></div>':''}</div>`;
+      ${PL.transferable(location.href)?`<div class="acts"><button class="btn" id="handoff">Continuer sur ${esc(name(site==='claude'?'chatgpt':'claude'))}</button></div>`:''}</div>`;
   }
   function pill(){
     const st=A.platformStatus(state,main),lim=limitInfo(),job=currentJob();
@@ -201,7 +201,7 @@
     wrapper.innerHTML=`${t}
       <div class="panel ${open?'':'hidden'}" role="region" aria-label="AI Flow"><div class="heading"><b>${logo(site)}AI Flow · ${esc(name(site))}</b><button id="close" class="x" aria-label="Fermer">✕</button></div>
       ${limitCard()}${checkpointSuggestion()}${switchBlock()}${blocks}${resumeSection()}
-      <div class="actions"><button class="link" data-page="dashboard">Tableau de bord</button>${PL.transferable(location.href)?`${flowHere()?'<button class="link" id="sync">Synchroniser</button>':''}<button class="link" id="transfer">Transférer</button><button class="link" id="checkpoint">Point de reprise</button>`:''}<button class="link" data-page="options">Paramètres</button></div></div>
+      <div class="actions"><button class="link" data-page="dashboard">Tableau de bord</button>${PL.transferable(location.href)?`${flowHere()?'<button class="link" id="sync">Synchroniser les avancées</button>':''}<button class="link" id="transfer">Continuer sur ${esc(name(site==='claude'?'chatgpt':'claude'))}</button><button class="link" id="checkpoint">Sauvegarder</button>`:''}<button class="link" data-page="options">Paramètres</button></div></div>
       <button class="pill" id="toggle" aria-expanded="${open}" aria-label="Afficher AI Flow"><span class="dot ${pl.level}"></span><span>AI Flow</span><span class="summary">${esc(pl.label)}</span><span class="chev">${open?'⌄':'⌃'}</span><span class="grip" title="Déplacer">⠿</span></button>`;
     bind();clampPosition();
   }

@@ -120,7 +120,7 @@
     else $('target').value=$('source-platform').value==='claude'?'chatgpt':'claude';
   }
   if(!capture)noCapture(params.get('why')==='err'?(params.get('err')||'La conversation n’a pas pu être lue.'):WHY[params.get('why')]||'');
-  if(params.get('mode')==='checkpoint'){$('page-title').textContent='Point de reprise';$('title').focus();}
+  if(params.get('mode')==='checkpoint'){$('page-title').textContent='Sauvegarder pour plus tard';document.querySelector('.hero .lead').textContent='Garde l’essentiel de ce travail (objectif, décisions, contraintes, prochaines étapes) pour le reprendre plus tard, ici ou ailleurs. Rien n’est envoyé.';$('title').focus();}
 
   $('form').addEventListener('input',update);$('form').addEventListener('change',update);
   for(const r of document.querySelectorAll('input[name="mode"]'))r.addEventListener('change',()=>{manual=false;$('regen').hidden=true;update();});

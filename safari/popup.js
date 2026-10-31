@@ -16,7 +16,7 @@
     const st=A.platformStatus(state,active.platform);
     const info=st.fresh.length?`${Math.round(st.worst)} % utilisés · ${A.formatReset(state.metrics[st.worstId]?.resetAt)}`:'Quota en cours de lecture…';
     const label=active.site==='chatgpt'?'Tu es sur ChatGPT (quotas Codex)':`Tu utilises ${A.platform(active.platform).name}`;
-    const actions=PL.transferable(active.url)?`<div class="now-actions"><button class="primary small" id="do-transfer">Transférer cette conversation</button><button class="ghost small" id="do-checkpoint">Point de reprise</button></div>`:'';
+    const actions=PL.transferable(active.url)?`<div class="now-actions"><button class="${U.flowOf(flows,active.url)?'ghost':'primary'} small" id="do-transfer" title="Poursuivre maintenant sur l’autre IA">Continuer sur ${esc(A.platform(active.site==='claude'?'chatgpt':'claude').name)}</button><button class="ghost small" id="do-checkpoint" title="Garder le contexte ici, sans changer d’IA">Sauvegarder pour plus tard</button></div>`:'';
     return `<section class="nowbar">${U.logo(active.site==='chatgpt'?'chatgpt':active.platform)}<div><b>${esc(label)}</b><small>${esc(info)}</small></div></section>${actions}${flowCard()}${busy?`<p class="fine" role="status">${busy}</p>`:''}`;
   }
   // Smart Context Sync : conversation active liée à une autre IA → « Synchroniser » et « Voir les détails ».
@@ -24,7 +24,7 @@
     const f=PL.transferable(active.url)&&U.flowOf(flows,active.url);if(!f)return '';
     const me=PL.conversationOf(active.url).url,other=f.ends.find(e=>e.url!==me),st=U.flowState(f);
     return `<div class="flow-card"><b>Flow · ${esc(f.title)}</b><small>Lié à ${esc(A.platform(other.platform).name)} « ${esc(other.title)} » · <span class="${st.pending?'warn':''}">${esc(st.text)}</span></small>
-      <div class="row-actions"><button class="primary small" id="do-sync" data-flow="${esc(f.id)}">Synchroniser</button><button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({sync:f.id,from:me}))}'>Voir les détails</button></div></div>`;
+      <div class="row-actions"><button class="primary small" id="do-sync" data-flow="${esc(f.id)}">Synchroniser les avancées</button><button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({sync:f.id,from:me}))}'>Voir les détails</button></div></div>`;
   }
   function continuity(){
     const rows=[],now=Date.now();
