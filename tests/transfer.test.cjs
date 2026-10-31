@@ -160,3 +160,10 @@ test('taille estimée du transfert selon la destination',()=>{
   assert.equal(A.estimateTransfer('x'.repeat(60000),'claude').level,'ok');
   assert.equal(A.estimateTransfer('x'.repeat(400),'claude').tokens,100);
 });
+test('transfert proposé seulement sur les conversations lisibles (pas Claude Code ni Codex)',()=>{
+  const PL=require('./helpers.cjs').core().AIFlowPlatforms;
+  assert.ok(PL.transferable('https://claude.ai/chat/abc-123'));
+  assert.ok(PL.transferable('https://chatgpt.com/c/xyz'));
+  assert.ok(PL.transferable('https://chatgpt.com/g/g-abc/c/xyz'));
+  for(const u of ['https://claude.ai/code/session_1','https://claude.ai/new','https://chatgpt.com/codex/tasks/task_e_42','https://chatgpt.com/codex','https://chatgpt.com/'])assert.equal(PL.transferable(u),null,u);
+});

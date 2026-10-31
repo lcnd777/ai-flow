@@ -1,3 +1,7 @@
+## 0.12.2 — Transfert proposé seulement là où il fonctionne
+
+- Les boutons « Transférer », « Point de reprise » et « Transférer le contexte » n’apparaissent plus sur les pages qu’AI Flow ne sait pas lire : sessions **Claude Code**, tâches **Codex**, pages d’accueil. Ils restent sur les conversations Claude (/chat/…) et ChatGPT (/c/…), dans la pastille comme dans la fenêtre AI Flow.
+
 ## 0.12.1 — Corrections après test sur Mac
 
 - **Transfert : les deux modes sont toujours visibles.** Si la page d’origine n’est pas une conversation lisible (par exemple une session **Claude Code**), la page de transfert explique pourquoi et propose les conversations Claude/ChatGPT ouvertes dans Safari : un clic les récupère. Une erreur de lecture est maintenant affichée au lieu d’être ignorée.

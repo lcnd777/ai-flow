@@ -154,7 +154,7 @@
   }
   // Flow Recovery : quand la limite approche, proposer discrètement un point de reprise (une fois par période).
   function checkpointSuggestion(){
-    const url=PL.conversationOf(location.href)?.url;if(!url||!['claude','chatgpt'].includes(site))return '';
+    const url=PL.transferable(location.href)?.url;if(!url)return '';
     const st=A.platformStatus(state,main);
     if(!['near','reached','reset-soon'].includes(st.radar))return '';
     if(checkpoints.some(d=>d.url===url&&d.kind==='checkpoint'&&d.status!=='done'))return '';
@@ -176,7 +176,7 @@
     return `<div class="switch"><b>Smart Switch</b><div class="tiny">${esc(name(main))} ${sw.pressured[0].limitReached?'a atteint sa limite':'approche de sa limite'}.</div>
       ${alts?`<div class="tiny" style="margin-top:6px">Capacité confirmée :</div>${alts}`:'<div class="tiny">Aucune autre plateforme avec une capacité confirmée.</div>'}
       ${unk.length?`<div class="tiny">État inconnu : ${esc(unk.join(', '))}.</div>`:''}${unm.length?`<div class="tiny">Non mesurées : ${esc(unm.join(', '))}.</div>`:''}
-      <div class="acts"><button class="btn" id="handoff">Transférer le contexte</button></div></div>`;
+      ${PL.transferable(location.href)?'<div class="acts"><button class="btn" id="handoff">Transférer le contexte</button></div>':''}</div>`;
   }
   function pill(){
     const st=A.platformStatus(state,main),lim=limitInfo(),job=currentJob();
@@ -199,7 +199,7 @@
     wrapper.innerHTML=`${t}
       <div class="panel ${open?'':'hidden'}" role="region" aria-label="AI Flow"><div class="heading"><b>${logo(site)}AI Flow · ${esc(name(site))}</b><button id="close" class="x" aria-label="Fermer">✕</button></div>
       ${limitCard()}${checkpointSuggestion()}${switchBlock()}${blocks}${resumeSection()}
-      <div class="actions"><button class="link" data-page="dashboard">Tableau de bord</button><button class="link" id="transfer">Transférer</button>${PL.conversationOf(location.href)&&['claude','chatgpt'].includes(site)?'<button class="link" id="checkpoint">Point de reprise</button>':''}<button class="link" data-page="options">Paramètres</button></div></div>
+      <div class="actions"><button class="link" data-page="dashboard">Tableau de bord</button>${PL.transferable(location.href)?'<button class="link" id="transfer">Transférer</button><button class="link" id="checkpoint">Point de reprise</button>':''}<button class="link" data-page="options">Paramètres</button></div></div>
       <button class="pill" id="toggle" aria-expanded="${open}" aria-label="Afficher AI Flow"><span class="dot ${pl.level}"></span><span>AI Flow</span><span class="summary">${esc(pl.label)}</span><span class="chev">${open?'⌄':'⌃'}</span><span class="grip" title="Déplacer">⠿</span></button>`;
     bind();clampPosition();
   }
@@ -209,7 +209,7 @@
     const text=String(window.getSelection?.()?.toString()||'').slice(0,20000);
     const dest=to||(site==='claude'?'chatgpt':'claude');
     let why=text.trim()?'':/^\/code(\/|$)/.test(location.pathname)?'code':'notconv',err='';
-    if(!text.trim()&&PL.conversationOf(location.href)){
+    if(!text.trim()&&PL.transferable(location.href)){
       try{await send('captureConversation',{});await send('openPage',{page:'transfer',query:{capture:'1',to:dest}});return;}
       catch(e){why='err';err=String(e?.message||'').slice(0,180);}
     }

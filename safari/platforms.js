@@ -49,5 +49,12 @@
     if(!p?.resume||!new RegExp(p.conversation).test(u.pathname))return null;
     return {platform:p.id,url:u.origin+u.pathname.replace(/\/$/,'')};
   }
-  root.AIFlowPlatforms={PLATFORMS,METRICS,ids,get,metricPlatform,forUrl,siteFor,conversationOf};
+  // Conversations qu'AI Flow sait lire pour un transfert : Claude (/chat/…) et ChatGPT (/c/…).
+  // Pas Claude Code ni les tâches Codex (format différent) : le transfert n'y est pas proposé.
+  function transferable(url){
+    const c=conversationOf(url);if(!c)return null;
+    const path=new URL(c.url).pathname;
+    return (c.platform==='claude'&&/^\/chat\//.test(path))||(c.platform==='chatgpt'&&/^\/(?:g\/[\w-]+\/)?c\//.test(path))?c:null;
+  }
+  root.AIFlowPlatforms={PLATFORMS,METRICS,ids,get,metricPlatform,forUrl,siteFor,conversationOf,transferable};
 })(typeof window!=='undefined'?window:globalThis);

@@ -201,6 +201,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const px=await ctx.newPage();await px.goto('https://chatgpt.com/codex/tasks/task_e_42');
   await sw.evaluate(()=>chrome.storage.local.set({ai_flow_auto_refresh_v1:{}}));await px.reload();await px.waitForTimeout(3000);
   let wx=text((await widget(px)).html);
+  check('Codex : pas de bouton « Transférer » (tâche non transférable)',!/id="transfer"/.test((await widget(px)).html));
   check('Codex : carte « Quota Codex atteint » avec heure automatique',/Quota Codex atteint/.test(wx)&&/Programmer à \d\d:\d\d/.test(wx),wx.slice(0,300));
   await px.screenshot({path:path.join(shots,'widget-codex-limit.png')});
   const pchat=await ctx.newPage();await pchat.goto('https://chatgpt.com/c/conversation-normale');await pchat.waitForTimeout(2000);

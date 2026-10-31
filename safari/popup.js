@@ -8,7 +8,7 @@
   try{
     const [tab]=await A.api.tabs.query({active:true,currentWindow:true});
     const site=tab?.url?PL.siteFor(tab.url):null;
-    if(site)active={tabId:tab.id,site,platform:site==='chatgpt'?'codex':site,conv:PL.conversationOf(tab.url),title:tab.title||''};
+    if(site)active={tabId:tab.id,site,platform:site==='chatgpt'?'codex':site,conv:PL.conversationOf(tab.url),url:tab.url,title:tab.title||''};
   }catch{}
 
   function nowBar(){
@@ -16,7 +16,7 @@
     const st=A.platformStatus(state,active.platform),run=A.platformRunway(state,active.platform);
     const info=A.runwayWorthShowing(run)?A.runwayText(run):st.fresh.length?`${Math.round(st.worst)} % utilisés · ${A.formatReset(state.metrics[st.worstId]?.resetAt)}`:'Quota en cours de lecture…';
     const label=active.site==='chatgpt'?'Tu es sur ChatGPT (quotas Codex)':`Tu utilises ${A.platform(active.platform).name}`;
-    const actions=active.conv&&['claude','chatgpt'].includes(active.site)?`<div class="now-actions"><button class="primary small" id="do-transfer">Transférer cette conversation</button><button class="ghost small" id="do-checkpoint">Point de reprise</button></div>`:'';
+    const actions=PL.transferable(active.url)?`<div class="now-actions"><button class="primary small" id="do-transfer">Transférer cette conversation</button><button class="ghost small" id="do-checkpoint">Point de reprise</button></div>`:'';
     return `<section class="nowbar">${U.logo(active.site==='chatgpt'?'chatgpt':active.platform)}<div><b>${esc(label)}</b><small>${esc(info)}</small></div></section>${actions}${busy?`<p class="fine" role="status">${esc(busy)}</p>`:''}`;
   }
   function continuity(){
