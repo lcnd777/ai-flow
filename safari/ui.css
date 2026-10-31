@@ -1,0 +1,59 @@
+:root{color-scheme:dark;--bg:#101413;--panel:#1a201e;--panel2:#202825;--edge:#2b3430;--ink:#f3f4ef;--muted:#98a7a0;--green:#9ad6b1;--orange:#e5ad76;--red:#e18b80;--line:rgba(213,232,219,.1)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased}.popup{width:386px;min-height:450px;max-height:630px;overflow:auto}.popup main{padding:21px 20px 16px}button,select,input{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}a:hover{text-decoration:underline} .top,.brand,.top-right,.row,.split,.section-head,.card-top,.provider,.setting-line,footer{display:flex;align-items:center;justify-content:space-between}.brand{justify-content:flex-start;gap:10px}.brand-symbol{display:flex;align-items:center;justify-content:center;background:#244437;color:#b4f6d0;width:33px;height:33px;border-radius:11px;font-size:25px}.brand-name{font-size:15px;font-weight:750;letter-spacing:-.5px}.sub{color:var(--muted);font-size:10px;margin-top:2px}.version{font-size:9px;color:var(--green);border:1px solid #38664f;border-radius:4px;padding:1px 4px;margin-left:3px}.top-right{gap:6px;font-size:10px}.tiny-dot{display:block;width:6px;height:6px;border-radius:50%;background:var(--green)}.muted{color:var(--muted)}.title-row{display:flex;justify-content:space-between;align-items:center;margin:26px 0 17px}.eyebrow{letter-spacing:2.3px;color:var(--green);font-size:10px;font-weight:750}h1{margin:8px 0 4px;font-size:27px;letter-spacing:-1.1px;line-height:1.15}.subtitle{margin:0;color:var(--muted);font-size:12px}.decor{font-size:29px;color:#52685e;font-weight:200}.cards{display:grid;gap:10px}.card{background:var(--panel);border:1px solid var(--edge);border-radius:13px;padding:14px}.card-top{gap:8px}.provider{gap:9px;justify-content:flex-start}.provider-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;font-size:15px;font-weight:700}.provider-icon.claude{background:#4e352d;color:#f0bd9b}.provider-icon.chatgpt{background:#25443b;color:#a3e6ca}.provider-title{font-size:14px;font-weight:700}.provider-description{font-size:11px;color:var(--muted);margin-top:3px}.state{font-size:10px;color:var(--muted);background:#29312e;padding:5px 7px;border-radius:6px;white-space:nowrap}.state.good{background:#264438;color:var(--green)}.state.warn{background:#4a3d2b;color:var(--orange)}.state.danger{background:#4b2f2d;color:var(--red)}.meters{margin-top:15px;display:grid;gap:13px}.meter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px}.meter-head span:first-child{color:#c1cbc4}.meter-value{font-weight:650;white-space:nowrap}.track{height:5px;background:#35403a;border-radius:20px;margin-top:8px;overflow:hidden}.bar{height:100%;background:var(--green);border-radius:20px;transition:width .22s}.bar.warn{background:var(--orange)}.bar.danger{background:var(--red)}.meter-meta{color:var(--muted);font-size:10px;margin-top:5px;display:flex;justify-content:space-between;gap:6px}.section-head{margin:20px 0 10px}h2{margin:0;font-size:13px;letter-spacing:-.12px}.tag{border:1px solid #3b5849;color:#b2debf;border-radius:6px;padding:4px 7px;font-size:10px}.tag.subtle{border-color:#3b4540;color:var(--muted)}.panel{background:var(--panel);border:1px solid var(--edge);padding:13px;border-radius:12px}.row.split{gap:12px}.panel label{display:block;color:#bcc9c0;font-size:11px;margin-bottom:7px}select,input{background:#252e29;border:1px solid #3c4a41;color:var(--ink);border-radius:7px;min-width:0;padding:9px 9px;outline:none}select:focus,input:focus{border-color:var(--green)}#duration{max-width:125px;font-size:11px} .advice{display:flex;gap:10px;align-items:flex-start;border-top:1px solid var(--line);margin-top:12px;padding-top:12px}.advice-icon{color:var(--green);font-size:16px}.advice p{margin:0;line-height:1.5;color:#bdcac1;font-size:11px}.form-panel>select{width:100%;margin-bottom:10px}.two-cols{display:grid;grid-template-columns:95px 1fr;gap:10px}.two-cols input{width:100%;font-size:11px}.primary{margin-top:11px;background:#b4e0c0;border:0;color:#12251b;border-radius:8px;font-weight:750;padding:11px 12px;width:100%;display:flex;justify-content:space-between}.primary:hover{background:#d2f2d8}.notice{font-size:11px;min-height:1px;margin-top:6px;color:var(--green)}.notice.error{color:var(--red)}.setting-line{gap:16px;margin:18px 1px}.setting-line div{display:grid;gap:4px}.setting-line b{font-size:12px}.setting-line span:not(.switch span){font-size:11px;color:var(--muted)}.switch{position:relative;display:inline-flex;width:35px;height:20px;flex-shrink:0}.switch input{opacity:0;position:absolute}.switch>span{background:#3d4842;border-radius:20px;position:absolute;inset:0;transition:.2s;cursor:pointer}.switch>span:after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#f5f5f2;transition:.2s}.switch input:checked+span{background:#458b69}.switch input:checked+span:after{transform:translateX(15px)}footer{border-top:1px solid var(--edge);padding-top:15px;color:var(--muted);font-size:11px}.hidden{display:none!important}
+/* Options page */.options{min-height:100vh}.options main{max-width:740px;margin:0 auto;padding:46px 20px}.options h1{font-size:36px}.options .intro{color:var(--muted);line-height:1.7;max-width:580px}.options .panel{margin:20px 0;padding:20px}.options .setting-line{margin:12px 0}.options .warning{color:var(--muted);font-size:12px;line-height:1.6}.options .danger-btn{background:none;border:1px solid #b36d68;color:#eea9a4;padding:9px 12px;border-radius:8px}
+
+/* V0.2 — compact reserve and Smart Switch */
+.inline-setting{border-top:1px solid var(--line);padding-top:12px;margin:12px 0 0!important}
+.inline-setting select{font-size:11px;width:95px;padding:7px}
+.switch-panel{margin-top:14px}.switch-panel b{font-size:12px}
+.quick-links{display:flex;gap:8px;margin-top:13px}
+.quick-links a{background:#26382e;border:1px solid #42624b;padding:10px 12px;border-radius:8px;font-size:11px;flex:1;text-align:center;color:#d2e9d8}
+.quick-links a:hover{background:#34503c;text-decoration:none}
+
+.switch-panel .tag{white-space:nowrap;flex-shrink:0}
+/* v0.3: adaptive dashboard, connector state and light mode. */
+.popup{width:min(440px,100vw);margin:0 auto;max-height:none}.connector-panel{margin-top:14px}.connector-panel>h2{margin-bottom:8px}.connector-panel .subtitle{font-size:11px;line-height:1.6}.connector{padding:14px 0;border-bottom:1px solid var(--edge)}.connector-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.secondary{border:1px solid var(--edge);border-radius:7px;background:var(--panel2);color:var(--ink);padding:8px 10px;font-size:11px;min-height:34px}.secondary:disabled{opacity:.5}.connector-panel>#refresh{margin-top:12px;margin-bottom:10px}#planner-metric{width:100%;margin-bottom:8px}#planner-metric~.subtitle{font-size:10px;line-height:1.5;margin-bottom:12px}button:focus-visible,a:focus-visible,.switch:focus-within{outline:2px solid var(--green);outline-offset:3px}.switch-panel .row{flex-wrap:wrap}.meter-head span:first-child,.panel label,.advice p{color:var(--muted)}@media(prefers-color-scheme:light){:root{color-scheme:light;--bg:#f5f7f3;--panel:#fff;--panel2:#eef3ed;--edge:#d6e0d5;--ink:#1c3024;--muted:#5d6f63;--green:#327c50;--orange:#8d6023;--red:#a7433a;--line:#dae3d7}.track{background:#dfe9de}.state{background:#eef1ec}.state.good{background:#e3f0e5}.state.warn{background:#fff0d9}.state.danger{background:#fce5e0}select,input{background:#f1f5ef;border-color:#cad8c8}.tag{color:#376444;border-color:#c4d5c3}.quick-links a{color:#2a5f3a;background:#edf5e9;border-color:#d0dfc9}.options .danger-btn{color:var(--red)}}
+@media(max-width:380px){.popup main{padding:16px 12px}.top-right{display:none}.card-top{flex-wrap:wrap}.two-cols{grid-template-columns:85px 1fr}.options h1{font-size:28px}.connector-actions button{flex:1}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+/* The actual checkbox owns the hit area, including keyboard and touch input. */
+.switch input{inset:0;width:100%;height:100%;margin:0;padding:0;z-index:1;cursor:pointer}.switch input:disabled{cursor:not-allowed}
+
+/* Safari 26: an explicit width/height before first paint avoids popover auto-size feedback. */
+html.popup-root { width: 400px; height: 560px; overflow: hidden; }
+html.popup-root body.popup { width: 400px; min-width: 400px; max-width: 400px; height: 560px; min-height: 560px; max-height: 560px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* V0.5.2: Safari popover remains compact; full dashboard gets proper breathing room. */
+.quick-actions{display:grid;gap:8px;margin:0 0 13px}
+.quick-actions .primary{margin:0;text-align:left;min-height:40px}
+.quick-claude{font-weight:650;text-align:center}
+.quick-actions .subtitle{line-height:1.5}
+.mobile-setup{margin-top:12px;font-size:11px}
+html.popup-root.dashboard-full{width:100%;height:auto;min-height:100%;overflow:visible}
+html.popup-root.dashboard-full body.popup{width:100%;min-width:0;max-width:none;height:auto;min-height:100vh;max-height:none;overflow:visible}
+html.dashboard-full .popup main{width:min(100%,900px);margin:0 auto;padding:32px 28px 44px}
+html.dashboard-full .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+html.dashboard-full .quick-actions{grid-template-columns:1fr 1fr}
+html.dashboard-full .quick-actions .subtitle{grid-column:1/-1}
+html.dashboard-full .title-row{margin:24px 0 22px}
+@media(max-width:650px){html.dashboard-full .cards,html.dashboard-full .quick-actions{grid-template-columns:1fr}html.dashboard-full .popup main{padding:22px 16px}}
+
+/* Grand tableau de bord facultatif ; le bouton Safari ouvre le popover compact. */
+html.dashboard-full .popup main{width:min(100%,1080px);padding:38px 32px 52px}
+html.dashboard-full #open-full{display:none}
+html.dashboard-full .quick-actions{grid-template-columns:1fr}
+html.dashboard-full h1{font-size:34px}
+html.dashboard-full .card{padding:20px}
+html.dashboard-full .cards{gap:18px}
+html.dashboard-full .panel{padding:20px}
+html.dashboard-full .meter-head{font-size:13px}
+html.dashboard-full .subtitle{font-size:13px}
+@media(max-width:650px){html.dashboard-full .popup main{padding:22px 16px}html.dashboard-full .cards{grid-template-columns:1fr}}
+
+/* 0.6.4 — compact first-party sign-in, clearly separated from quota access */
+.connection-panel{margin:0 0 13px}.connection-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+.connection-panel .subtitle{font-size:11px;line-height:1.5}
+.account-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 0;border-bottom:1px solid var(--edge)}
+.account-row:last-child{border-bottom:0;padding-bottom:3px}.account-name{font-size:12px;font-weight:700}
+.account-state{display:block;color:var(--muted);font-size:10px;line-height:1.5;margin-top:3px}
+.account-state.verified{color:var(--green)}.account-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.account-actions .secondary{padding:7px 8px;min-height:31px}.connection-panel .notice{margin-top:7px}
