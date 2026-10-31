@@ -22,7 +22,7 @@ jobs:
       - run: npm test
   build:
     needs: test
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       BUILD: ${{ github.run_number }}
       FEED_URL: https://github.com/${{ github.repository }}/releases/download/dev-channel/appcast.xml
@@ -44,7 +44,7 @@ jobs:
           node-version: 22
       - name: Vérifier la clé de mise à jour
         run: |
-          [ -n "$SPARKLE_ED_PRIVATE_KEY" ] || { echo "::error::Ajoute le secret SPARKLE_ED_PRIVATE_KEY (docs/DEV-WORKFLOW.md)"; exit 1; }
+          [ -n "$SPARKLE_ED_PRIVATE_KEY" ] || echo "::warning::Secret SPARKLE_ED_PRIVATE_KEY absent : l’app est compilée et vérifiée, mais pas publiée (docs/DEV-WORKFLOW.md)." 
       - name: Version
         run: |
           echo "VERSION=$(node -p "require('./safari/manifest.json').version")" >> "$GITHUB_ENV"
@@ -89,13 +89,25 @@ jobs:
           xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
           xcrun stapler staple "$APP"
       - name: Archive, signature Sparkle et appcast
+        if: env.SPARKLE_ED_PRIVATE_KEY != ''
         run: |
           ZIP="AI-Flow-Dev-$BUILD.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
           node tools/dev/publish-appcast.mjs "$ZIP" "$BUILD" "$VERSION" "$REPO_URL/releases/download/dev-$BUILD/$ZIP" appcast.xml
           cp "$ZIP" AI-Flow-Dev.zip
           echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+      - name: Archive de contrôle (sans publication)
+        if: env.SPARKLE_ED_PRIVATE_KEY == ''
+        run: ditto -c -k --sequesterRsrc --keepParent "$APP" AI-Flow-Dev-non-publie.zip
+      - name: Conserver l’archive de contrôle
+        if: env.SPARKLE_ED_PRIVATE_KEY == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Flow-Dev-build-${{ github.run_number }}
+          path: AI-Flow-Dev-non-publie.zip
+          retention-days: 7
       - name: Publier
+        if: env.SPARKLE_ED_PRIVATE_KEY != ''
         run: |
           gh release create "dev-$BUILD" "$ZIP" --prerelease --title "AI Flow Dev $VERSION (build $BUILD)" --notes "$(git log -1 --pretty=%B)"
           gh release view dev-channel >/dev/null 2>&1 || gh release create dev-channel --prerelease --title "AI Flow Dev — canal de mise à jour" --notes "Flux Sparkle de l’app de développement. Installation initiale : AI-Flow-Dev.zip."
