@@ -2,7 +2,6 @@
 
 - **Stocké localement** (`storage.local` du navigateur, sur cet appareil uniquement) :
   - pourcentages, dates de reset et libellés de quota ;
-  - historique de 7 jours ;
   - diagnostics : statut et code HTTP, jamais de réponse brute ;
   - réglages ;
   - reprises de travail que tu enregistres volontairement ;

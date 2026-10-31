@@ -1,3 +1,11 @@
+## 0.9.0 — Plus simple : Claude et Codex, relance automatique pour Codex, Awake expliqué
+
+- **Grok retiré** (lecture expérimentale non vérifiable). AI Flow suit désormais Claude et Codex uniquement.
+- **Relance automatique pour Codex**, comme pour Claude : dans une tâche Codex (chatgpt.com/codex/tasks/…), quand le quota Codex est atteint, la pastille propose « Programmer à HH:MM » à la réouverture lue automatiquement, puis vérifie que Codex est bien rouvert avant d’envoyer. Dans une conversation ChatGPT classique, dont les limites ne sont pas lisibles, l’heure reste à choisir.
+- **Awake expliqué** : pourquoi (une relance ne part pas si le Mac s’endort), ce que fait la commande, et ce qui est normal (rien ne s’affiche dans Terminal).
+- **Historique retiré** : il ne pouvait pas refléter ta vraie consommation heure par heure. Les relevés n’existent que lorsqu’un onglet est ouvert, et les quotas sont arrondis par la plateforme. Les données d’historique déjà enregistrées sont supprimées.
+- Tests : 39 unitaires, 43 vérifications d’intégration.
+
 ## 0.8.2 — Boutons et réglages réparés sur Safari, IA non mesurables retirées, vraie consommation
 
 ### Corrigé

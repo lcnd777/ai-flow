@@ -23,16 +23,19 @@
     </section>
 
     <section class="panel"><h2>Pastille dans les sites</h2>
-      <div class="setting"><div><b>Afficher la pastille AI Flow</b><span>En bas à droite de Claude, ChatGPT (Codex) et Grok.</span></div><label class="switch"><input type="checkbox" data-setting="widgetEnabled"><span></span></label></div>
+      <div class="setting"><div><b>Afficher la pastille AI Flow</b><span>En bas à droite de Claude et de ChatGPT (Codex).</span></div><label class="switch"><input type="checkbox" data-setting="widgetEnabled"><span></span></label></div>
       <div class="setting"><div><b>Flow Guardian</b><span>La pastille affiche « Pas d’alerte » au lieu des pourcentages tant que tout va bien.</span></div><label class="switch"><input type="checkbox" data-setting="focusMode"><span></span></label></div>
     </section>
 
     <section class="panel"><h2>Continuité</h2>
-      <div class="setting"><div><b>Relance après quota</b><span>Quand Claude atteint sa limite dans une conversation, la pastille propose de la relancer à la réouverture. Sur ChatGPT, tu choisis l’heure. Un seul envoi, annulable.</span></div><label class="switch"><input type="checkbox" data-setting="resumePrompt"><span></span></label></div>
-      <div class="setting"><div><b>Awake : garder le Mac éveillé</b><span>Empêche la mise en veille automatique jusqu’à 10 min après une relance programmée, puis s’arrête tout seul.</span></div><label class="switch"><input type="checkbox" data-setting="awakeEnabled"><span></span></label></div>
+      <div class="setting"><div><b>Relance après quota</b><span>Quand Claude (dans une conversation) ou Codex (dans une tâche sur chatgpt.com/codex) atteint sa limite, la pastille propose de relancer à la réouverture, en un clic. Dans une conversation ChatGPT classique, dont les limites ne sont pas lisibles, tu choisis l’heure. Un seul envoi, annulable.</span></div><label class="switch"><input type="checkbox" data-setting="resumePrompt"><span></span></label></div>
+      <div class="setting"><div><b>Awake : garder le Mac éveillé</b><span>Pour que la relance programmée parte même si tu t’absentes : sans ça, le Mac se met en veille et la relance est manquée.</span></div><label class="switch"><input type="checkbox" data-setting="awakeEnabled"><span></span></label></div>
       <div class="kv"><span>État</span><b id="awake-state" class="muted">Vérification…</b></div>
       <div id="awake-terminal" class="terminal" hidden>
-        <p class="fine">Sans l’app Mac (pas besoin d’Xcode) : macOS sait déjà empêcher la veille avec la commande <code>caffeinate</code>. Copie-la, colle-la dans <b>Terminal</b> et appuie sur Entrée. Laisse la fenêtre ouverte : la commande s’arrête toute seule 10 min après la relance. Pour arrêter avant, ferme la fenêtre (ou ctrl + C).</p>
+        <p class="fine"><b>Pourquoi ?</b> Une relance programmée ne part que si ton Mac est allumé et Safari ouvert. Si tu t’absentes, le Mac se met en veille au bout de quelques minutes : Safari s’arrête et la relance est manquée.</p>
+        <p class="fine"><b>Que fait la commande ?</b> Elle demande à macOS de ne pas se mettre en veille pendant le temps indiqué (en secondes), jusqu’à 10 min après ta relance. L’écran peut s’éteindre, ce n’est pas grave.</p>
+        <p class="fine"><b>Comment ?</b> 1. Copier. 2. Ouvrir Terminal (Applications › Utilitaires). 3. Coller (⌘V) puis Entrée. <b>Il ne se passe rien à l’écran : c’est normal</b>, la commande attend. Laisse la fenêtre ouverte. À l’heure prévue, elle se termine seule et ton Mac reprend son comportement habituel. Pour arrêter plus tôt : ferme la fenêtre.</p>
+        <p class="fine">Inutile si ton Mac ne se met jamais en veille tout seul (par exemple branché sur secteur avec la veille désactivée dans Réglages Système).</p>
         <div class="cmd"><code id="awake-cmd"></code><button type="button" id="awake-copy" class="primary small">Copier</button></div>
         <p class="fine" id="awake-cmd-note"></p>
       </div>
@@ -48,8 +51,8 @@
     </section>
 
     <section class="panel"><h2>Données et confidentialité</h2>
-      <p class="fine">AI Flow enregistre localement des pourcentages, des dates de reset, l’historique des 7 derniers jours, tes reprises et tes réglages. Aucun mot de passe, cookie, jeton de session ni contenu de conversation n’est enregistré. Rien n’est envoyé à un serveur AI Flow : il n’y en a pas. Les lectures passent par ta session dans l’onglet officiel de chaque plateforme. Les lecteurs Claude, Codex et Grok utilisent des interfaces web internes non documentées : elles peuvent changer sans préavis. AI Flow affiche alors « Indisponible ».</p>
-      <div class="row-actions"><button type="button" id="export" class="ghost small">Exporter l’historique (JSON)</button><button type="button" id="clear-history" class="ghost small">Effacer l’historique</button><button type="button" id="clear" class="danger small">Supprimer tous les relevés</button></div>
+      <p class="fine">AI Flow enregistre localement des pourcentages, des dates de reset, tes reprises et tes réglages. Aucun mot de passe, cookie, jeton de session ni contenu de conversation n’est enregistré. Rien n’est envoyé à un serveur AI Flow : il n’y en a pas. Les lectures passent par ta session dans l’onglet officiel de chaque plateforme. Les lecteurs Claude et Codex utilisent des interfaces web internes non documentées : elles peuvent changer sans préavis. AI Flow affiche alors « Indisponible ».</p>
+      <div class="row-actions"><button type="button" id="clear" class="danger small">Supprimer tous les relevés</button></div>
       <p id="notice" class="fine" role="status"></p>
     </section>
     <p class="fine center" id="version"></p>

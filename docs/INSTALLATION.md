@@ -1,4 +1,4 @@
-# Installer AI Flow 0.8.2
+# Installer AI Flow 0.9.0
 
 **Pas besoin d’Xcode.** Pour tout utiliser, Safari et le Terminal suffisent. Xcode ne sert qu’à l’installation « app Mac », facultative (voir B).
 
@@ -11,15 +11,15 @@
 
 ## 0. Décompresser l’archive
 
-Double-clique sur `AI-Flow-v0.8.2-Safari-Mac.zip` dans **Téléchargements** : un dossier apparaît. Il contient un sous-dossier `safari`.
+Double-clique sur `AI-Flow-v0.9.0-Safari-Mac.zip` dans **Téléchargements** : un dossier apparaît. Il contient un sous-dossier `safari`.
 
 ## A. Sans Xcode : extension temporaire dans Safari
 
 1. Safari › **Réglages** › **Avancés** : coche « Afficher les fonctionnalités pour les développeurs web ».
 2. Safari › Réglages › **Développeur** : clique **Ajouter une extension temporaire…**, puis choisis le dossier **`safari`** à l’intérieur du dossier décompressé.
 3. Si l’ancienne version d’AI Flow est encore installée, désactive-la dans Safari › Réglages › **Extensions**.
-4. Dans Safari › Réglages › Extensions › AI Flow, autorise l’accès aux sites (claude.ai, chatgpt.com, grok.com…).
-5. Ouvre Claude (et/ou ChatGPT, Grok) dans un onglet, connecte-toi, puis recharge la page.
+4. Dans Safari › Réglages › Extensions › AI Flow, autorise l’accès aux sites (claude.ai et chatgpt.com).
+5. Ouvre Claude et/ou ChatGPT dans un onglet, connecte-toi, puis recharge la page.
 
 Safari retire l’extension temporaire quand tu le quittes : refais l’étape 2 au lancement suivant. Tes réglages et relevés peuvent être perdus à ce moment-là.
 
@@ -57,7 +57,7 @@ Pour mettre à jour plus tard, relance `./prepare-safari.sh`. Il crée un nouvea
 
 ## Chrome / Edge
 
-1. Décompresse `AI-Flow-v0.8.2-Chrome-Edge.zip`.
+1. Décompresse `AI-Flow-v0.9.0-Chrome-Edge.zip`.
 2. Ouvre `chrome://extensions` ou `edge://extensions` et active le **Mode développeur**.
 3. Clique **Charger l'extension non empaquetée** et choisis le dossier `chrome-edge`.
 

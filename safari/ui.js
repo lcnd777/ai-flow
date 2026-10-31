@@ -79,9 +79,9 @@
   }
   async function loadExtras(){
     const K=A.KEYS;
-    try{const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.drafts,K.history,K.auto]);
-      return {jobs:v[K.resume]||{},last:v[K.resumeLast]||null,drafts:Array.isArray(v[K.drafts])?v[K.drafts]:[],history:A.cleanHistory(v[K.history]),auto:v[K.auto]||{}};}
-    catch{return {jobs:{},last:null,drafts:[],history:A.cleanHistory(null),auto:{}};}
+    try{const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.drafts,K.auto]);
+      return {jobs:v[K.resume]||{},last:v[K.resumeLast]||null,drafts:Array.isArray(v[K.drafts])?v[K.drafts]:[],auto:v[K.auto]||{}};}
+    catch{return {jobs:{},last:null,drafts:[],auto:{}};}
   }
   // Toujours un onglet normal : le popup Safari est trop petit pour ces pages.
   async function openPage(page,query){

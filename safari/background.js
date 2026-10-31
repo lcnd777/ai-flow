@@ -107,7 +107,6 @@ async function refreshPlatform(pid,tab){
       if(accounts[pid]!==result.account){accounts[pid]=result.account;await save(ACCOUNT_KEY,accounts);}
     }
     const {state}=await write('metrics',{platform:pid,readings});
-    await save(K.history,A.recordHistory(await load(K.history,null),readings));
     await notify(state);
   }else if(result.status==='login'){
     // Déconnecté : les anciens pourcentages ne sont plus attribuables à un compte.
@@ -294,12 +293,13 @@ async function fireResume(id){
     await api.alarms.create('ai-flow-resume:'+id,{when:j.at});
     await syncKeepAwake();
   };
-  // 1. La session Claude est-elle vraiment rouverte ? (ChatGPT n'expose pas ce compteur.)
-  if(job.platform==='claude'){
-    const tab=pickTab('claude',await allTabs());
+  // 1. Le quota est-il vraiment rouvert ? (Claude pour ses conversations, Codex sur chatgpt.com.)
+  const check=job.platform==='claude'?{p:'claude',ids:['claude.session','claude.weekly']}:job.url.includes('/codex/')?{p:'codex',ids:['codex.session','codex.weekly']}:null;
+  if(check){
+    const tab=pickTab(check.p,await allTabs());
     if(tab){
-      const r=await refreshPlatform('claude',tab),st=await A.getState();
-      const full=['claude.session','claude.weekly'].some(i=>st.metrics[i]&&!A.isStale(st.metrics[i],i)&&st.metrics[i].percent>=A.THRESHOLDS.LIMIT);
+      const r=await refreshPlatform(check.p,tab),st=await A.getState();
+      const full=check.ids.some(i=>st.metrics[i]&&!A.isStale(st.metrics[i],i)&&st.metrics[i].percent>=A.THRESHOLDS.LIMIT);
       if((r.status==='ok'||r.status==='partial')&&full)return retry('quota-plein',5);
     }
   }
@@ -343,9 +343,8 @@ async function handle(message,sender){
     case 'resumeCancel':return resumeCancel(String(payload?.id||''));
     case 'awakeStatus':return awakeStatus();
     case 'awakeTest':return awakeTest();
-    case 'clearHistory':await save(K.history,null);return true;
     case 'clear':{
-      await api.storage.local.set({[K.diag]:{},[K.notify]:null,[K.history]:null,[ACCOUNT_KEY]:{}});
+      await api.storage.local.set({[K.diag]:{},[K.notify]:null,[ACCOUNT_KEY]:{}});
       await write('clear');await badge();return true;
     }
     case 'settings':{
@@ -379,10 +378,10 @@ async function install(){
 }
 api.runtime.onInstalled.addListener(()=>serial(async()=>{
   // Migration 0.8.0 : suppression des anciens suivis (rechargeaient des onglets) et clés obsolètes.
-  try{await api.storage.local.remove(['ai_flow_trackers_v3','ai_flow_alerts_v3','ai_flow_claude_org_v1','ai_flow_native_status']);}catch{}
+  try{await api.storage.local.remove(['ai_flow_trackers_v3','ai_flow_alerts_v3','ai_flow_claude_org_v1','ai_flow_native_status',K.history]);}catch{}
   const s=await A.getState();await api.storage.local.set({[A.KEY]:s});
   await install();
 }));
 api.runtime.onStartup?.addListener(()=>serial(install));
 serial(install);
-if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle});
+if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume});

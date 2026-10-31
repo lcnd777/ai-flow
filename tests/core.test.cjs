@@ -11,18 +11,18 @@ test('clean : refuse toute valeur non observée ou invalide',()=>{
   assert.deepEqual(plain(Object.keys(s.metrics)),['codex.weekly']);
 });
 test('clean : ordre et masquage des plateformes assainis',()=>{
-  const s=A.clean({settings:{platformOrder:['grok','zzz','grok','claude'],platformHidden:{grok:true,gemini:true,claude:'oui'}}});
-  assert.equal(s.settings.platformOrder[0],'grok');assert.equal(s.settings.platformOrder[1],'claude');
-  assert.equal(s.settings.platformOrder.length,3);
-  assert.deepEqual(JSON.parse(JSON.stringify(s.settings.platformHidden)),{grok:true},'plateforme retirée ignorée');
-  assert.deepEqual(plain(A.clean({}).settings.platformOrder),['claude','codex','grok'],'seules les IA mesurables sont proposées');
+  const s=A.clean({settings:{platformOrder:['codex','zzz','codex','claude'],platformHidden:{codex:true,grok:true,claude:'oui'}}});
+  assert.equal(s.settings.platformOrder[0],'codex');assert.equal(s.settings.platformOrder[1],'claude');
+  assert.equal(s.settings.platformOrder.length,2);
+  assert.deepEqual(JSON.parse(JSON.stringify(s.settings.platformHidden)),{codex:true},'plateforme retirée ignorée');
+  assert.deepEqual(plain(A.clean({}).settings.platformOrder),['claude','codex'],'seules les IA mesurables sont proposées');
   assert.equal(A.clean({}).settings.awakeEnabled,false,'Awake désactivé par défaut');
 });
 test('reduce metrics : n’accepte que les quotas de la plateforme annoncée',()=>{
   const s=st();
   assert.throws(()=>A.reduce(s,'metrics',{platform:'claude',readings:[{id:'codex.weekly',percent:10}]},NOW));
-  const out=A.reduce(s,'metrics',{platform:'grok',readings:[{id:'grok.queries',percent:25,detail:'grok-4 · 15/20',resetAt:NOW-1}]},NOW);
-  assert.equal(out[0].percent,25);assert.equal(out[0].resetAt,null,'reset passé ignoré');assert.equal(s.metrics['grok.queries'].detail,'grok-4 · 15/20');
+  const out=A.reduce(s,'metrics',{platform:'codex',readings:[{id:'codex.weekly',percent:25,detail:'détail',resetAt:NOW-1}]},NOW);
+  assert.equal(out[0].percent,25);assert.equal(out[0].resetAt,null,'reset passé ignoré');assert.equal(s.metrics['codex.weekly'].detail,'détail');
 });
 test('isStale : 15 min de fraîcheur, reset passé = périmé',()=>{
   assert.equal(A.isStale(obs(10,14*MIN),'x',NOW),false);
@@ -62,29 +62,12 @@ test('Smart Switch : ne recommande que des capacités connues',()=>{
   const sw=A.smartSwitch(s,NOW);
   assert.deepEqual(plain(sw.pressured.map(x=>x.platform)),['claude']);
   assert.deepEqual(plain(sw.available.map(x=>x.platform)),['codex']);
-  assert.ok(sw.unknown.some(x=>x.platform==='grok'),'relevé périmé = état inconnu');
+  const stale=A.smartSwitch(st({'claude.session':obs(92),'codex.session':obs(10,40*MIN)}),NOW);
+  assert.ok(stale.unknown.some(x=>x.platform==='codex')&&!stale.available.length,'relevé périmé = état inconnu, jamais recommandé');
   assert.ok(!sw.available.some(x=>x.platform==='chatgpt'),'ChatGPT (non mesuré) jamais recommandé');
 });
 test('Smart Switch : rien à proposer quand tout va bien',()=>{
   assert.equal(A.smartSwitch(st({'claude.session':obs(10)}),NOW).pressured.length,0);
-});
-test('historique : échantillonnage, reset constaté, période de limite',()=>{
-  let h=null;
-  h=A.recordHistory(h,[{id:'claude.session',percent:50}],NOW-60*MIN);
-  h=A.recordHistory(h,[{id:'claude.session',percent:50}],NOW-58*MIN);
-  assert.equal(h.series['claude.session'].length,1,'valeur identique < 10 min : pas de doublon');
-  const quick=A.recordHistory(A.recordHistory(null,[{id:'codex.session',percent:30}],NOW-20000),[{id:'codex.session',percent:60}],NOW);
-  assert.equal(quick.series['codex.session'].length,2,'hausse rapide conservée (consommation)');
-  h=A.recordHistory(h,[{id:'claude.session',percent:100}],NOW-40*MIN);
-  assert.equal(h.limits.length,1);assert.equal(h.limits[0].to,null);
-  h=A.recordHistory(h,[{id:'claude.session',percent:3}],NOW-5*MIN);
-  assert.equal(h.limits[0].to,NOW-5*MIN);assert.equal(h.resets.length,1);assert.equal(h.resets[0].from,100);
-  const old=A.recordHistory({series:{'claude.session':[[NOW-8*24*H,10]]}},[{id:'claude.session',percent:11}],NOW);
-  assert.equal(old.series['claude.session'].length,1,'plus de 7 jours : purgé');
-});
-test('historique : un trou de plus de 20 min coupe la courbe',()=>{
-  const segs=A.segments([[NOW-60*MIN,1],[NOW-55*MIN,2],[NOW-10*MIN,3],[NOW,4]],NOW-H,NOW);
-  assert.equal(segs.length,2);
 });
 test('notifications : une seule alerte par période, puis reset confirmé',()=>{
   let s=st({'claude.session':obs(91,0,H)});
@@ -122,7 +105,8 @@ test('plateformes : ChatGPT et Codex distincts sur chatgpt.com, conversations re
   const P=C.AIFlowPlatforms;
   assert.deepEqual(plain(P.forUrl('https://chatgpt.com/c/abc')),['chatgpt','codex']);
   assert.equal(P.siteFor('https://chatgpt.com/'),'chatgpt');
-  assert.equal(P.siteFor('https://grok.com/'),'grok');
+  assert.equal(P.siteFor('https://grok.com/'),null,'Grok retiré');
+  assert.equal(P.conversationOf('https://chatgpt.com/codex/tasks/task_e_1').url,'https://chatgpt.com/codex/tasks/task_e_1','tâche Codex relançable');
   assert.deepEqual(JSON.parse(JSON.stringify(P.conversationOf('https://claude.ai/chat/1234-abc/'))),{platform:'claude',url:'https://claude.ai/chat/1234-abc'});
   assert.equal(P.conversationOf('https://claude.ai/new'),null);
   assert.equal(P.conversationOf('http://claude.ai/chat/x'),null);
@@ -138,10 +122,4 @@ test('Smart Switch : ne propose jamais la plateforme courante',()=>{
 test('Awake mode Terminal : commande caffeinate calculée jusqu’à l’échéance',()=>{
   assert.equal(A.caffeinateCommand(NOW+2*H+600000,NOW),'caffeinate -i -t 7800');
   assert.equal(A.caffeinateCommand(NOW-1,NOW),'','échéance passée : aucune commande');
-});
-test('consommation : somme des hausses par tranche, resets ignorés, tranches sans mesure signalées',()=>{
-  const from=NOW-3*H;
-  const pts=[[from+5*MIN,10],[from+20*MIN,25],[from+50*MIN,30],[from+2*H+10*MIN,2],[from+2*H+40*MIN,12]];
-  const b=A.consumption(pts,from,NOW,H);
-  assert.deepEqual(plain(b.map(x=>[x.used,x.measured])),[[20,true],[0,false],[10,true]]);
 });

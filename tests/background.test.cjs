@@ -5,6 +5,7 @@ const ORG='0b2c6c1e-1234-4abc-8def-001122334455';
 const future=h=>new Date(Date.now()+h*3600000).toISOString();
 
 function setup(opts={}){
+  let codex=opts.codex||{used5:10,usedW:22};
   let usage=opts.usage||{five_hour:{utilization:30,resets_at:future(2)},seven_day:{utilization:20,resets_at:future(70)}};
   let org=ORG,status=200;
   const fb=fakeBrowser({...opts,inject:async(tab,func,args)=>{
@@ -15,14 +16,14 @@ function setup(opts={}){
       if(url.endsWith('/api/organizations'))return {body:[{uuid:org,capabilities:['chat']}]};
       if(url.endsWith('/api/auth/session'))return {body:{accessToken:'tok'}};
       if(url.includes('/api/organizations/'))return {body:usage};
-      if(url.endsWith('/wham/usage'))return {body:{rate_limit:{primary_window:{limit_window_seconds:18000,used_percent:10},secondary_window:{limit_window_seconds:604800,used_percent:22}}}};
+      if(url.endsWith('/wham/usage'))return {body:{rate_limit:{primary_window:{limit_window_seconds:18000,used_percent:codex.used5},secondary_window:{limit_window_seconds:604800,used_percent:codex.usedW}}}};
     })).result;
   }});
   const ctx=load(['platforms.js','shared.js','readers.js','background.js'],{browser:fb.browser,__AIFLOW_TEST__:{}});
   const page={id:'ext',url:'chrome-extension://ext/popup.html',frameId:0};
   const call=(op,payload,sender=page)=>fb.send({type:'AI_FLOW',op,payload},sender);
   return {fb,ctx,T:ctx.__AIFLOW_TEST__,A:ctx.AIFlow,call,page,
-    setUsage:u=>{usage=u;},setOrg:o=>{org=o;},setStatus:s=>{status=s;}};
+    setUsage:u=>{usage=u;},setCodex:c=>{codex=c;},setOrg:o=>{org=o;},setStatus:s=>{status=s;}};
 }
 const site=(fb,url)=>{const t=fb.addTab(url);return {id:'ext',url,frameId:0,tab:{id:t.id}};};
 
@@ -62,7 +63,6 @@ test('Actualisation auto : quotas lus dans l’onglet ouvert, popup = widget (m�
   const s=A.clean(fb.store[A.KEY]);
   assert.equal(s.metrics['claude.session'].percent,30);
   assert.equal(s.metrics['codex.weekly'].percent,22);
-  assert.ok(fb.store[A.KEYS.history].series['claude.session'].length===1,'historique alimenté');
   assert.equal(fb.store[A.KEYS.diag].claude.status,'ok');
   assert.equal(fb.reloaded.length,0);assert.equal(fb.created.length,0);
   assert.ok(!JSON.stringify(fb.store).includes('tok'),'aucun jeton stocké');
@@ -145,7 +145,8 @@ test('Relance : uniquement depuis une conversation, message borné',async()=>{
   assert.equal((await call('resumeArm',{at:Date.now()+3600000,message:'x'},site(fb,'https://claude.ai/new'))).ok,false);
   assert.equal((await call('resumeArm',{at:Date.now()+3600000,message:'x'.repeat(2001)},site(fb,'https://claude.ai/chat/a'))).ok,false);
   assert.equal((await call('resumeArm',{at:Date.now()+1000,message:'x'},site(fb,'https://claude.ai/chat/a'))).ok,false);
-  assert.equal((await call('resumeArm',{at:Date.now()+3600000,message:'x'},site(fb,'https://grok.com/'))).ok,false,'Grok : relance non prise en charge');
+  assert.equal((await call('resumeArm',{at:Date.now()+3600000,message:'x'},site(fb,'https://chatgpt.com/codex'))).ok,false,'page Codex sans tâche : refusée');
+  assert.equal((await call('resumeArm',{at:Date.now()+3600000,message:'x'},site(fb,'https://chatgpt.com/codex/tasks/task_e_1'))).ok,true,'tâche Codex : acceptée');
 });
 test('Safari sans app Mac : un appel natif sans réponse ne bloque plus rien',async()=>{
   const {call,fb,A}=setup({native:true,nativeReply:()=>new Promise(()=>{})});
@@ -165,4 +166,16 @@ test('Page de l’extension sans URL (popup Safari) reconnue',async()=>{
   const {call}=setup();
   const r=await call('settings',{focusMode:false},{id:'ext',frameId:0});
   assert.equal(r.ok,true);
+});
+test('Relance Codex : attend que le quota Codex soit vraiment rouvert, puis envoie',async()=>{
+  const {fb,call,T,setCodex}=setup({codex:{used5:100,usedW:40}});
+  fb.addTab('https://chatgpt.com/codex');
+  const s=site(fb,'https://chatgpt.com/codex/tasks/task_e_1');
+  const r=await call('resumeArm',{at:Date.now()+60000,message:'Continue'},s);
+  await T.fireResume(r.value.id);
+  assert.equal(fb.store['ai_flow_resume_v1'][r.value.id].status,'quota encore plein','pas d’envoi tant que Codex est plein');
+  setCodex({used5:2,usedW:41});
+  await T.fireResume(r.value.id);
+  assert.equal(fb.store['ai_flow_resume_v1'][r.value.id],undefined);
+  assert.equal(fb.store['ai_flow_resume_last_v1'].status,'envoyée');
 });

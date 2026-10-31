@@ -45,20 +45,3 @@ test('Codex : fenêtre inconnue jamais étiquetée session ou semaine',async()=>
   assert.equal(result.status,'no-figures');
   assert.equal((await runReader(C,R.codex,'chatgpt.com',()=>({body:{}}))).result.status,'login','pas de jeton = connexion requise');
 });
-test('Grok (expérimental) : pourcentage dérivé des requêtes restantes',async()=>{
-  const {result,calls}=await runReader(C,R.grok,'grok.com',(url,init)=>{
-    const body=JSON.parse(init.body);
-    return body.modelName==='grok-4'?{body:{windowSizeSeconds:7200,remainingQueries:15,totalQueries:20}}:{status:500};
-  });
-  assert.equal(result.status,'ok');
-  assert.equal(result.readings[0].percent,25);
-  assert.match(result.readings[0].detail,/15\/20 restantes · fenêtre 2 h/);
-  assert.equal(calls.length,1);assert.equal(calls[0].url,'https://grok.com/rest/rate-limits');
-});
-test('Grok : réponse incohérente → aucune valeur inventée',async()=>{
-  const {result}=await runReader(C,R.grok,'grok.com',()=>({body:{windowSizeSeconds:7200,remainingQueries:30,totalQueries:20}}));
-  assert.equal(result.status,'no-figures');
-  assert.equal((await runReader(C,R.grok,'grok.com',()=>({status:401}))).result.status,'login');
-  const z=await runReader(C,R.grok,'grok.com',()=>({body:{windowSizeSeconds:7200,remainingQueries:0,totalQueries:20,waitTimeSeconds:600}}));
-  assert.equal(z.result.readings[0].percent,100);assert.ok(z.result.readings[0].resetAt>Date.now());
-});

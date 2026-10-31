@@ -77,12 +77,6 @@
     catch(e){notice(e.message);await awake();}
     finally{b.disabled=false;}
   };
-  $('export').onclick=async()=>{
-    const {history}=await U.loadExtras();
-    const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),note:'Mesures réelles uniquement. Les trous correspondent à l’absence de relevé.',history},null,2)],{type:'application/json'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI-Flow-historique.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000);
-  };
-  $('clear-history').onclick=async()=>{if(!confirm('Effacer l’historique de consommation ?'))return;try{await A.request('clearHistory');notice('Historique effacé.');}catch(e){notice(e.message);}};
   $('clear').onclick=async()=>{if(!confirm('Supprimer tous les relevés, l’historique et les diagnostics ?'))return;try{await A.request('clear');state=await A.getState();render();notice('Relevés supprimés. Ils reviendront à la prochaine lecture d’un onglet ouvert.');}catch(e){notice(e.message);}};
   async function reload(){try{state=await A.getState();}catch{}auto=(await U.loadExtras()).auto;try{conn=await A.request('connectionStatuses');}catch{}render();}
   U.bindNav(document);render();await reload();awake();

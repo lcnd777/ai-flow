@@ -132,40 +132,5 @@
     finally{clearTimeout(timer);}
   }
 
-  // Grok (EXPÉRIMENTAL, non vérifié sur compte réel) : endpoint web interne /rest/rate-limits
-  // utilisé par l'interface de grok.com. Lecture seule ; ne consomme pas de requête.
-  async function grok(){
-    if(location.protocol!=='https:'||location.hostname!=='grok.com')return {status:'wrong-origin'};
-    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),9000);
-    let httpStatus=null;
-    const ask=async modelName=>{
-      const r=await fetch('https://grok.com/rest/rate-limits',{method:'POST',credentials:'include',cache:'no-store',signal:ctrl.signal,
-        headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({requestKind:'DEFAULT',modelName})});
-      httpStatus=r.status;
-      if(r.status===401||r.status===403)return {error:'login'};
-      if(r.status===429)return {error:'rate-limit'};
-      if(!r.ok)return {error:'http'};
-      try{return {value:await r.json()};}catch{return {error:'invalid-json'};}
-    };
-    const int=v=>Number.isInteger(v)&&v>=0&&v<=10000000?v:null;
-    const span=s=>s%86400===0?`${s/86400} j`:s%3600===0?`${s/3600} h`:`${Math.round(s/60)} min`;
-    try{
-      let last='no-figures';
-      for(const model of ['grok-4','grok-3']){
-        const res=await ask(model);
-        if(res.error==='login'||res.error==='rate-limit')return {status:res.error,httpStatus};
-        if(res.error){last=res.error;continue;}
-        const v=res.value||{};
-        const total=int(v.totalQueries),remaining=int(v.remainingQueries),win=int(v.windowSizeSeconds),wait=int(v.waitTimeSeconds);
-        if(!total||remaining===null||remaining>total||!win||win>7*86400){last='no-figures';continue;}
-        const percent=Math.round((total-remaining)/total*1000)/10;
-        const resetAt=remaining===0&&wait?Date.now()+wait*1000:null;
-        return {status:'ok',httpStatus,readings:[{id:'grok.queries',percent,resetAt,detail:`${model} · ${remaining}/${total} restantes · fenêtre ${span(win)}`}]};
-      }
-      return {status:last,httpStatus};
-    }catch(e){return {status:e?.name==='AbortError'?'timeout':'network',httpStatus};}
-    finally{clearTimeout(timer);}
-  }
-
-  root.AIFlowReaders={claude,codex,grok};
+  root.AIFlowReaders={claude,codex};
 })(typeof window!=='undefined'?window:globalThis);

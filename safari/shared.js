@@ -196,56 +196,6 @@
     };
   }
 
-  // ---------- Historique local (24 h / 7 jours) ----------
-  function cleanHistory(h,now=Date.now()){
-    const out={series:{},resets:[],limits:[]};
-    if(!h||typeof h!=='object')return out;
-    for(const [id,pts] of Object.entries(h.series||{})){
-      if(!METRICS[id]||!Array.isArray(pts))continue;
-      const list=pts.filter(p=>Array.isArray(p)&&Number.isFinite(p[0])&&validPercent(p[1])&&p[0]<=now+60000&&now-p[0]<=7*DAY);
-      if(list.length)out.series[id]=list.slice(-3000);
-    }
-    out.resets=(Array.isArray(h.resets)?h.resets:[]).filter(r=>METRICS[r?.id]&&Number.isFinite(r.t)&&now-r.t<=7*DAY).slice(-200);
-    out.limits=(Array.isArray(h.limits)?h.limits:[]).filter(l=>METRICS[l?.id]&&Number.isFinite(l.from)&&(l.to===null||Number.isFinite(l.to))&&now-(l.to??now)<=7*DAY).slice(-200);
-    return out;
-  }
-  function recordHistory(raw,readings,now=Date.now()){
-    const h=cleanHistory(raw,now);
-    for(const r of readings){
-      if(!METRICS[r.id]||!validPercent(r.percent))continue;
-      const s=h.series[r.id]||(h.series[r.id]=[]),last=s.at(-1);
-      if(last&&r.percent+10<=last[1])h.resets.push({id:r.id,t:now,from:last[1],to:r.percent});
-      // Chaque changement est conservé (sinon une hausse serait perdue pour la consommation).
-      if(!last||last[1]!==r.percent||now-last[0]>=10*60000)s.push([now,r.percent]);
-      const open=h.limits.find(l=>l.id===r.id&&l.to===null);
-      if(r.percent>=LIMIT&&!open)h.limits.push({id:r.id,from:now,to:null});
-      if(r.percent<LIMIT&&open)open.to=now;
-      if(s.length>3000)s.splice(0,s.length-3000);
-    }
-    return h;
-  }
-  // Découpe une série en segments : un trou de plus de 20 min = données manquantes.
-  function segments(points,from,to,gap=20*60000){
-    const list=points.filter(p=>p[0]>=from&&p[0]<=to),out=[];let cur=[];
-    for(const p of list){if(cur.length&&p[0]-cur.at(-1)[0]>gap){out.push(cur);cur=[];}cur.push(p);}
-    if(cur.length)out.push(cur);
-    return out;
-  }
-
-  // Consommation réelle : somme des hausses entre deux relevés (les resets ne comptent pas),
-  // rangée par tranche (heure ou jour). Une tranche sans relevé est marquée « non mesurée ».
-  function consumption(points,from,to,bucket,maxGap=5*3600000){
-    const n=Math.max(1,Math.ceil((to-from)/bucket)),out=Array.from({length:n},(_,i)=>({t:from+i*bucket,used:0,measured:false}));
-    const list=points.filter(p=>p[0]<=to).sort((a,b)=>a[0]-b[0]);
-    for(let i=0;i<list.length;i++){
-      const [t,p]=list[i];if(t<from)continue;
-      const b=out[Math.min(n-1,Math.floor((t-from)/bucket))];b.measured=true;
-      const prev=list[i-1];
-      if(prev&&p>prev[1]&&t-prev[0]<=maxGap)b.used+=p-prev[1];
-    }
-    for(const b of out)b.used=Math.round(b.used*10)/10;
-    return out;
-  }
   // ---------- Notifications (sans répétition) ----------
   function notificationEvents(rawMemo,state,now=Date.now()){
     const memo={sent:{},reached:{}};
@@ -332,6 +282,6 @@
 
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
-    pace,autonomy,platformAutonomy,autonomyText,fmtDuration,smartSwitch,cleanHistory,recordHistory,segments,consumption,notificationEvents,describeEvents,
+    pace,autonomy,platformAutonomy,autonomyText,fmtDuration,smartSwitch,notificationEvents,describeEvents,
     HANDOFF_FIELDS,buildHandoff,caffeinateCommand,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

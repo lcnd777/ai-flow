@@ -69,11 +69,17 @@
   const hhmm=ts=>A.clock(ts);
   function nextAt(v){const m=/^(\d{2}):(\d{2})$/.exec(v||'');if(!m)return NaN;const d=new Date();d.setHours(+m[1],+m[2],0,0);if(d.getTime()<=Date.now()+30000)d.setDate(d.getDate()+1);return d.getTime();}
   function currentJob(){const c=conv();return c?Object.values(resumeData.jobs).find(j=>j.url===c)||null:null;}
-  // Claude seulement : ses compteurs session / semaine sont ceux qui bloquent une conversation.
+  // Compteurs qui bloquent le travail : Claude dans ses conversations, Codex dans ses tâches (chatgpt.com/codex).
+  const LIMITS={claude:{platform:'claude',ids:['claude.session','claude.weekly']},chatgpt:{platform:'codex',ids:['codex.session','codex.weekly']}};
+  function limitScope(){
+    const l=LIMITS[site];if(!l)return null;
+    if(site==='chatgpt'&&!/^\/codex\//.test(location.pathname))return null;
+    return l;
+  }
   function limitInfo(){
-    if(site!=='claude')return null;
-    const st=A.platformStatus(state,'claude');
-    const full=['claude.session','claude.weekly'].filter(id=>st.fresh.includes(id)&&state.metrics[id].percent>=A.THRESHOLDS.LIMIT).map(id=>state.metrics[id]);
+    const l=limitScope();if(!l)return null;
+    const st=A.platformStatus(state,l.platform);
+    const full=l.ids.filter(id=>st.fresh.includes(id)&&state.metrics[id].percent>=A.THRESHOLDS.LIMIT).map(id=>state.metrics[id]);
     if(!full.length)return null;
     const r=full.map(m=>m.resetAt).filter(Boolean);
     return {resetAt:r.length===full.length?Math.max(...r):null};
@@ -81,7 +87,7 @@
   const limitKey=lim=>conv()+'|'+(lim.resetAt||'unknown');
   function limitPrompt(){const lim=limitInfo();if(!state.settings.resumePrompt||!lim||!conv()||currentJob()||dismissed[limitKey(lim)])return null;return lim;}
   function defaultForm(){
-    const lim=limitInfo(),s=site==='claude'?state.metrics['claude.session']?.resetAt:null;
+    const l=limitScope(),lim=limitInfo(),s=l?state.metrics[l.ids[0]]?.resetAt:null;
     const base=lim?.resetAt||(s&&s>Date.now()?s:null),presetAt=base?base+2*60000:null;
     return {time:presetAt?hhmm(presetAt):'',presetAt,text:form.text||DEFAULT_TEXT,keepAwake:true,error:''};
   }
@@ -103,11 +109,11 @@
     if(!formOpen&&limitPrompt())return '';
     if(!conv())return `<div class="resume tiny">Relance après quota : ouvre une conversation pour la programmer.</div>`;
     const job=currentJob();
-    if(job)return `<div class="resume"><div class="row"><span>Relance prévue <b>${esc(A.dayClock(job.at))}</b></span><button id="resume-cancel" class="link" data-id="${esc(job.id)}">Annuler</button></div><div class="tiny">« ${esc(job.message.slice(0,80))}${job.message.length>80?'…':''} »${esc(awakeLine(job))}${job.attempts?` · nouvel essai (${esc(job.status)})`:''}</div>${terminalMode(job)?`<div class="acts"><button id="awake-copy" class="btn" data-cmd="${esc(A.caffeinateCommand(job.at+A.AWAKE_GRACE))}">Copier la commande Terminal</button></div><div class="tiny" id="awake-copied">Colle-la dans Terminal (⌘V, Entrée) et laisse la fenêtre ouverte.</div>`:''}</div>`;
+    if(job)return `<div class="resume"><div class="row"><span>Relance prévue <b>${esc(A.dayClock(job.at))}</b></span><button id="resume-cancel" class="link" data-id="${esc(job.id)}">Annuler</button></div><div class="tiny">« ${esc(job.message.slice(0,80))}${job.message.length>80?'…':''} »${esc(awakeLine(job))}${job.attempts?` · nouvel essai (${esc(job.status)})`:''}</div>${terminalMode(job)?`<div class="acts"><button id="awake-copy" class="btn" data-cmd="${esc(A.caffeinateCommand(job.at+A.AWAKE_GRACE))}">Copier la commande Terminal</button></div><div class="tiny" id="awake-copied">Sans ça, ton Mac peut se mettre en veille avant ${esc(hhmm(job.at))} et la relance serait manquée. Colle la commande dans Terminal (⌘V, Entrée) : rien ne s’affiche, c’est normal. Laisse la fenêtre ouverte, elle s’arrête toute seule.</div>`:''}</div>`;
     const last=resumeData.last&&resumeData.last.url===conv()?`<div class="tiny">Dernière relance : ${esc(resumeData.last.status)} · ${esc(A.dayClock(resumeData.last.at))}</div>`:'';
     if(!formOpen)return `<div class="resume">${last}<button id="resume-open" class="link">Relancer automatiquement à la réouverture…</button></div>`;
-    return `<div class="resume resume-form"><div class="tiny">Envoie ce message une seule fois dans cette conversation, à l’heure choisie${site==='claude'?' (si la session Claude est bien rouverte)':''}.</div>
-      <label class="tiny">Heure${site==='chatgpt'?' (indiquée par ChatGPT dans le message de limite)':''}<input id="resume-time" type="time" value="${esc(form.time)}"></label>
+    return `<div class="resume resume-form"><div class="tiny">Envoie ce message une seule fois dans cette conversation, à l’heure choisie${limitScope()?` (seulement si le quota ${esc(name(limitScope().platform))} est bien rouvert)`:''}.</div>
+      <label class="tiny">Heure${limitScope()?'':' (indiquée dans le message de limite)'}<input id="resume-time" type="time" value="${esc(form.time)}"></label>
       <label class="tiny">Message<textarea id="resume-text" rows="3" maxlength="2000">${esc(form.text)}</textarea></label>
       ${state.settings.awakeEnabled?`<label class="tiny check"><input id="resume-awake" type="checkbox" ${form.keepAwake?'checked':''}> Garder le Mac éveillé jusque-là (Awake)</label>`:'<div class="tiny">Mac éveillé : Awake est désactivé (Paramètres).</div>'}
       <div class="tiny warn">Envoi automatique depuis ton compte : ${esc(PL.get(site).vendor)} encadre l’usage de scripts sur son site. Laisse Safari ouvert.</div>
@@ -122,8 +128,9 @@
   function limitCard(){
     const lim=limitPrompt();if(!lim)return '';
     const at=lim.resetAt?lim.resetAt+2*60000:null;
-    return `<div class="card" role="alert"><b>Quota Claude atteint</b>
-      <div class="tiny">${lim.resetAt?`La session rouvre ${esc(A.dayClock(lim.resetAt))}.`:'Heure de réouverture inconnue.'} Relancer automatiquement cette conversation à ce moment-là ?</div>
+    const who=name(limitScope().platform);
+    return `<div class="card" role="alert"><b>Quota ${esc(who)} atteint</b>
+      <div class="tiny">${lim.resetAt?`${esc(who)} rouvre ${esc(A.dayClock(lim.resetAt))}.`:'Heure de réouverture inconnue.'} Relancer automatiquement ${site==='claude'?'cette conversation':'cette tâche'} à ce moment-là ?</div>
       <div class="acts">${at?`<button id="limit-arm" class="btn" data-at="${at}">Programmer à ${esc(hhmm(at))}</button>`:''}<button id="limit-custom" class="link">${at?'Personnaliser':'Choisir l’heure'}</button><button id="limit-dismiss" class="link">Non merci</button></div>
       ${form.error&&!formOpen?`<div class="tiny err">${esc(form.error)}</div>`:''}</div>`;
   }
@@ -210,7 +217,7 @@
     });
     $('awake-copy')?.addEventListener('click',async e=>{
       const cmd=e.currentTarget.dataset.cmd,info=$('awake-copied');
-      try{await navigator.clipboard.writeText(cmd);info.textContent='Copiée. Ouvre Terminal, colle (⌘V), appuie sur Entrée et laisse la fenêtre ouverte.';}
+      try{await navigator.clipboard.writeText(cmd);info.textContent='Copiée. Ouvre Terminal (Applications › Utilitaires), colle (⌘V), appuie sur Entrée. Rien ne s’affiche : c’est normal, laisse la fenêtre ouverte jusqu’à la relance.';}
       catch{info.textContent='Copie refusée. Tape dans Terminal : '+cmd;}
     });
     $('resume-cancel')?.addEventListener('click',async e=>{try{await send('resumeCancel',{id:e.currentTarget.dataset.id});}catch{}await loadAux();render();});
