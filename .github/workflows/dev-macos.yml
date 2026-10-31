@@ -67,10 +67,14 @@ jobs:
           echo "SIGN_IDENTITY=Developer ID Application" >> "$GITHUB_ENV"
       - name: Compiler
         run: |
+          # Signature ad hoc (pas de compte Apple) : le runtime renforcé refuserait de charger Sparkle.framework
+          # (validation des bibliothèques par Team ID) et l'app se fermerait au lancement. Activé avec Developer ID.
+          HARDENED=YES; [ -n "${SIGN_IDENTITY:-}" ] || HARDENED=NO
           xcodebuild -project macos/AIFlowDev.xcodeproj -scheme AIFlowDev -configuration Release \
             -derivedDataPath build/dd -destination 'generic/platform=macOS' \
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" AIFLOW_FEED_URL="$FEED_URL" \
             CODE_SIGN_IDENTITY="${SIGN_IDENTITY:--}" DEVELOPMENT_TEAM="${APPLE_TEAM_ID}" OTHER_CODE_SIGN_FLAGS="--timestamp" \
+            ENABLE_HARDENED_RUNTIME="$HARDENED" \
             build | tail -40
           APP="build/dd/Build/Products/Release/AI Flow Dev.app"
           echo "APP=$APP" >> "$GITHUB_ENV"
@@ -81,6 +85,11 @@ jobs:
           test -f "$APP/Contents/PlugIns/AI Flow Dev Extension.appex/Contents/Resources/manifest.json"
           test -d "$APP/Contents/Frameworks/Sparkle.framework"
           codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv "$APP" 2>&1 | grep -E "flags|TeamIdentifier|Signature" || true
+          # Démarrage réel de l'app : elle doit rester ouverte 10 s (détecte un plantage au lancement).
+          "$APP/Contents/MacOS/AI Flow Dev" & PID=$!
+          sleep 10
+          if kill -0 $PID 2>/dev/null; then echo "Lancement OK"; kill $PID; else echo "::error::L'app s'est fermée au lancement"; wait $PID; exit 1; fi
       - name: Notarisation Apple (si fournie)
         if: env.NOTARY_KEY_P8_BASE64 != '' && env.SIGN_IDENTITY != ''
         run: |
