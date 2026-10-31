@@ -167,8 +167,9 @@
   function render(){
     const show=state.settings.widgetEnabled;host.style.display=show?'':'none';if(!show)return;
     if(limitPrompt()){const k=limitKey(limitInfo());if(autoOpenedFor!==k){autoOpenedFor=k;open=true;}}
-    const pl=pill(),multi=sitePlatforms.length>1;
-    const blocks=[main,...sitePlatforms.filter(p=>p!==main)].map(pid=>`${multi?`<div class="sub">${esc(name(pid))}</div>`:''}${meters(pid)}`).join('');
+    const pl=pill();
+    const shown=[main,...sitePlatforms.filter(p=>p!==main)].filter(p=>PL.get(p).support!=='none'),multi=shown.length>1;
+    const blocks=shown.map(pid=>`${multi?`<div class="sub">${esc(name(pid))}</div>`:''}${meters(pid)}`).join('');
     const t=toast&&!open?`<div class="toast ${esc(toast.type)}" role="status"><b>${esc(toast.title)}</b><div class="tiny">${esc(toast.body)}</div><div class="row"><button class="link" id="toast-open">Voir</button><button class="link" id="toast-close">Fermer</button></div></div>`:'';
     wrapper.innerHTML=`${t}
       <div class="panel ${open?'':'hidden'}" role="region" aria-label="AI Flow"><div class="heading"><b>${logo(site)}AI Flow · ${esc(name(site))}</b><button id="close" class="x" aria-label="Fermer">✕</button></div>

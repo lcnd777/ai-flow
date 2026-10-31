@@ -13,11 +13,13 @@
     <div id="switch"></div>
     <section><div class="sec-head"><h2>Plateformes</h2><span id="sync" class="sync"></span></div><div id="platforms" class="grid"></div>
       <p class="fine">Les pourcentages viennent uniquement des plateformes elles-mêmes, lus dans tes onglets ouverts. « Indisponible » signifie que la valeur n’a pas pu être lue, jamais 0 %. Les estimations d’autonomie sont calculées localement et signalées comme telles.</p></section>
-    <section class="panel"><div class="sec-head"><h2>Historique</h2>
+    <section class="panel"><div class="sec-head"><h2>Ma consommation</h2>
       <div class="seg" role="tablist"><button type="button" data-range="24" class="on" role="tab">24 h</button><button type="button" data-range="168" role="tab">7 jours</button></div></div>
       <label class="inline">Quota <select id="metric"></select></label>
+      <p id="history-summary" class="lead small"></p>
       <div id="chart" class="chart"></div>
-      <div class="legend"><span><i class="lg-line"></i>Mesure réelle</span><span><i class="lg-limit"></i>Limite atteinte</span><span><i class="lg-reset"></i>Reset constaté</span><span><i class="lg-gap"></i>Aucune donnée</span></div>
+      <div class="legend"><span><i class="lg-line"></i>Part du quota consommée</span><span><i class="lg-limit"></i>Limite atteinte</span><span><i class="lg-gap"></i>Aucune mesure (aucun onglet ouvert)</span></div>
+      <p class="fine">Chaque barre montre ce que tu as utilisé pendant l’heure (ou le jour), en % du quota choisi. Les mesures ne se font que lorsqu’un onglet de la plateforme est ouvert dans ce navigateur : l’usage depuis l’app ou le téléphone est compté au relevé suivant. Tout reste sur cet appareil.</p>
       <div id="events" class="events"></div>
     </section>
     <section class="panel"><div class="sec-head"><h2>Continuité</h2><button type="button" class="ghost small" data-open-page="options">Réglages ›</button></div>

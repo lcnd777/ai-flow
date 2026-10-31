@@ -1,4 +1,4 @@
-# Installer AI Flow 0.8.1
+# Installer AI Flow 0.8.2
 
 **Pas besoin d’Xcode.** Pour tout utiliser, Safari et le Terminal suffisent. Xcode ne sert qu’à l’installation « app Mac », facultative (voir B).
 
@@ -11,7 +11,7 @@
 
 ## 0. Décompresser l’archive
 
-Double-clique sur `AI-Flow-v0.8.1-Safari-Mac.zip` dans **Téléchargements** : un dossier apparaît. Il contient un sous-dossier `safari`.
+Double-clique sur `AI-Flow-v0.8.2-Safari-Mac.zip` dans **Téléchargements** : un dossier apparaît. Il contient un sous-dossier `safari`.
 
 ## A. Sans Xcode : extension temporaire dans Safari
 
@@ -57,7 +57,7 @@ Pour mettre à jour plus tard, relance `./prepare-safari.sh`. Il crée un nouvea
 
 ## Chrome / Edge
 
-1. Décompresse `AI-Flow-v0.8.1-Chrome-Edge.zip`.
+1. Décompresse `AI-Flow-v0.8.2-Chrome-Edge.zip`.
 2. Ouvre `chrome://extensions` ou `edge://extensions` et active le **Mode développeur**.
 3. Clique **Charger l'extension non empaquetée** et choisis le dossier `chrome-edge`.
 

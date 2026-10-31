@@ -1,11 +1,11 @@
-# Validation de la 0.8.1
+# Validation de la 0.8.2
 
 ## Tests exécutés
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Unitaires et non-régression (Node 22, sans dépendance) | `npm test` | **40 / 40** |
-| Intégration navigateur : extension Chrome/Edge réelle dans Chromium 1.63 (Playwright), sites **simulés** | `xvfb-run -a node tests/e2e/run.cjs` | **41 / 41** |
+| Unitaires et non-régression (Node 22, sans dépendance) | `npm test` | **43 / 43** |
+| Intégration navigateur : extension Chrome/Edge réelle dans Chromium 1.63 (Playwright), sites **simulés** | `xvfb-run -a node tests/e2e/run.cjs` | **43 / 43** |
 
 ### Ce que couvrent les tests unitaires
 - **Cœur** : nettoyage de l'état (refus des valeurs non observées, hors bornes ou d'une autre plateforme), fraîcheur de 15 min, statuts « non mesuré », « partiel » et « limite atteinte ».
@@ -30,6 +30,9 @@
 - Smart Switch, autonomie estimée et historique tracé.
 - Limite atteinte : la carte de relance s'ouvre, la relance est programmée à la réouverture + 2 min, envoyée une seule fois (vrai `executeScript`) et son résultat est enregistré, puis la notification « de nouveau disponible » arrive.
 - Transfert depuis la pastille avec la sélection, aperçu structuré et modifiable, reprise enregistrée et visible dans le popup.
+
+## Défaut trouvé sur Safari réel (0.8.1) et corrigé en 0.8.2
+Sans app Mac, Safari ne répond jamais à un appel natif, ce que Chromium ne reproduit pas (l’appel y échoue immédiatement). Un test reproduit désormais ce cas : un appel natif qui ne répond jamais ne doit bloquer ni les réglages ni les ouvertures de pages.
 
 ## Ce qui n'a PAS pu être vérifié ici
 - **Safari** (Mac, iPhone, iPad) : aucun Safari n'est disponible dans l'environnement de développement (Linux). Le code utilise les mêmes API que la 0.7, déjà validée par l'utilisateur sur Safari Mac pour la lecture Claude et Codex, mais la 0.8 doit être testée sur Safari.

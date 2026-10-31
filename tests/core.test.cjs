@@ -11,10 +11,11 @@ test('clean : refuse toute valeur non observée ou invalide',()=>{
   assert.deepEqual(plain(Object.keys(s.metrics)),['codex.weekly']);
 });
 test('clean : ordre et masquage des plateformes assainis',()=>{
-  const s=A.clean({settings:{platformOrder:['grok','zzz','grok','claude'],platformHidden:{gemini:true,foo:true,claude:'oui'}}});
+  const s=A.clean({settings:{platformOrder:['grok','zzz','grok','claude'],platformHidden:{grok:true,gemini:true,claude:'oui'}}});
   assert.equal(s.settings.platformOrder[0],'grok');assert.equal(s.settings.platformOrder[1],'claude');
-  assert.equal(s.settings.platformOrder.length,A.PLATFORMS.length);
-  assert.deepEqual(JSON.parse(JSON.stringify(s.settings.platformHidden)),{gemini:true});
+  assert.equal(s.settings.platformOrder.length,3);
+  assert.deepEqual(JSON.parse(JSON.stringify(s.settings.platformHidden)),{grok:true},'plateforme retirée ignorée');
+  assert.deepEqual(plain(A.clean({}).settings.platformOrder),['claude','codex','grok'],'seules les IA mesurables sont proposées');
   assert.equal(A.clean({}).settings.awakeEnabled,false,'Awake désactivé par défaut');
 });
 test('reduce metrics : n’accepte que les quotas de la plateforme annoncée',()=>{
@@ -30,7 +31,6 @@ test('isStale : 15 min de fraîcheur, reset passé = périmé',()=>{
 });
 test('platformStatus : non mesuré, partiel, limite atteinte',()=>{
   const s=st({'claude.session':obs(100,MIN,H),'claude.weekly':obs(100,MIN,3*H)});
-  assert.equal(A.platformStatus(s,'gemini',NOW).level,'unmeasured');
   assert.equal(A.platformStatus(s,'chatgpt',NOW).level,'unmeasured','ChatGPT conversation jamais chiffré');
   const c=A.platformStatus(s,'claude',NOW);
   assert.equal(c.limitReached,true);assert.equal(c.reopenAt,NOW+3*H);assert.equal(c.level,'critical');
@@ -63,8 +63,7 @@ test('Smart Switch : ne recommande que des capacités connues',()=>{
   assert.deepEqual(plain(sw.pressured.map(x=>x.platform)),['claude']);
   assert.deepEqual(plain(sw.available.map(x=>x.platform)),['codex']);
   assert.ok(sw.unknown.some(x=>x.platform==='grok'),'relevé périmé = état inconnu');
-  assert.ok(sw.unmeasured.some(x=>x.platform==='chatgpt'));
-  assert.ok(!sw.available.some(x=>x.platform==='chatgpt'||x.platform==='gemini'));
+  assert.ok(!sw.available.some(x=>x.platform==='chatgpt'),'ChatGPT (non mesuré) jamais recommandé');
 });
 test('Smart Switch : rien à proposer quand tout va bien',()=>{
   assert.equal(A.smartSwitch(st({'claude.session':obs(10)}),NOW).pressured.length,0);
@@ -74,6 +73,8 @@ test('historique : échantillonnage, reset constaté, période de limite',()=>{
   h=A.recordHistory(h,[{id:'claude.session',percent:50}],NOW-60*MIN);
   h=A.recordHistory(h,[{id:'claude.session',percent:50}],NOW-58*MIN);
   assert.equal(h.series['claude.session'].length,1,'valeur identique < 10 min : pas de doublon');
+  const quick=A.recordHistory(A.recordHistory(null,[{id:'codex.session',percent:30}],NOW-20000),[{id:'codex.session',percent:60}],NOW);
+  assert.equal(quick.series['codex.session'].length,2,'hausse rapide conservée (consommation)');
   h=A.recordHistory(h,[{id:'claude.session',percent:100}],NOW-40*MIN);
   assert.equal(h.limits.length,1);assert.equal(h.limits[0].to,null);
   h=A.recordHistory(h,[{id:'claude.session',percent:3}],NOW-5*MIN);
@@ -137,4 +138,10 @@ test('Smart Switch : ne propose jamais la plateforme courante',()=>{
 test('Awake mode Terminal : commande caffeinate calculée jusqu’à l’échéance',()=>{
   assert.equal(A.caffeinateCommand(NOW+2*H+600000,NOW),'caffeinate -i -t 7800');
   assert.equal(A.caffeinateCommand(NOW-1,NOW),'','échéance passée : aucune commande');
+});
+test('consommation : somme des hausses par tranche, resets ignorés, tranches sans mesure signalées',()=>{
+  const from=NOW-3*H;
+  const pts=[[from+5*MIN,10],[from+20*MIN,25],[from+50*MIN,30],[from+2*H+10*MIN,2],[from+2*H+40*MIN,12]];
+  const b=A.consumption(pts,from,NOW,H);
+  assert.deepEqual(plain(b.map(x=>[x.used,x.measured])),[[20,true],[0,false],[10,true]]);
 });

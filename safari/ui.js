@@ -85,12 +85,13 @@
   }
   // Toujours un onglet normal : le popup Safari est trop petit pour ces pages.
   async function openPage(page,query){
-    try{await A.request('openPage',{page,query});}
-    catch{const url=A.api.runtime.getURL(page+'.html')+(query?'?'+new URLSearchParams(query):'');await A.api.tabs.create({url,active:true});}
+    try{await A.request('openPage',{page,query},{timeout:2500});}
+    catch{const url=A.api.runtime.getURL(page+'.html')+(query?'?'+new URLSearchParams(query):'');try{await A.api.tabs.create({url,active:true});}catch{location.href=url;return;}}
     if(document.body.classList.contains('popup'))window.close();
   }
   async function openPlatform(pid){
-    try{await A.request('openPlatform',{platform:pid});}catch{}
+    try{await A.request('openPlatform',{platform:pid},{timeout:2500});}
+    catch{const p=A.platform(pid);if(p)try{await A.api.tabs.create({url:p.home,active:true});}catch{window.open(p.home,'_blank');}}
     if(document.body.classList.contains('popup'))window.close();
   }
   function bindNav(rootEl){

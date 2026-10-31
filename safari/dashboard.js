@@ -16,26 +16,36 @@
     return parts.join(' ')||'Ouvre Claude, ChatGPT ou Grok dans un onglet : les quotas apparaissent en quelques secondes.';
   }
   function chart(){
-    const h=extras.history,ids=Object.keys(h.series).filter(id=>A.METRICS[id]);
+    const h=extras.history,ids=Object.keys(h.series).filter(id=>A.METRICS[id]&&A.visiblePlatforms(state).includes(A.METRICS[id].platform));
     const sel=$('metric');
-    if(!ids.length){sel.innerHTML='<option>Aucun relevé</option>';sel.disabled=true;$('chart').innerHTML='<p class="note">L’historique se construit automatiquement à partir des relevés réels, sur cet appareil uniquement.</p>';$('events').innerHTML='';return;}
+    if(!ids.length){sel.innerHTML='<option>Aucune mesure pour l’instant</option>';sel.disabled=true;$('history-summary').textContent='';$('chart').innerHTML='<p class="note">Ta consommation apparaîtra ici après quelques relevés : garde un onglet Claude, ChatGPT (Codex) ou Grok ouvert pendant que tu travailles.</p>';$('events').innerHTML='';return;}
     sel.disabled=false;
     if(!metric||!ids.includes(metric))metric=ids.includes('claude.session')?'claude.session':ids[0];
     sel.innerHTML=ids.map(id=>`<option value="${id}" ${id===metric?'selected':''}>${esc(A.METRICS[id].label)}</option>`).join('');
-    const now=Date.now(),from=now-range*3600000,W=640,H=190,P=28;
-    const x=t=>P+(t-from)/(now-from)*(W-P-8),y=p=>H-22-(p/100)*(H-36);
-    const segs=A.segments(h.series[metric]||[],from,now);
+    const now=Date.now(),bucket=range===24?3600000:86400000;
+    const end=range===24?Math.ceil(now/3600000)*3600000:new Date(new Date(now).setHours(24,0,0,0)).getTime();
+    const from=end-range*3600000;
+    const bars=A.consumption(h.series[metric]||[],from,end,bucket);
     const limits=h.limits.filter(l=>l.id===metric&&(l.to??now)>=from);
     const resets=h.resets.filter(r=>r.id===metric&&r.t>=from);
-    const grid=[0,50,80,100].map(p=>`<line x1="${P}" x2="${W-8}" y1="${y(p)}" y2="${y(p)}" class="g${p===80?' warn':''}"/><text x="${P-6}" y="${y(p)+3}" text-anchor="end">${p}</text>`).join('');
-    const ticks=[];const step=range===24?6*3600000:24*3600000;
-    for(let t=Math.ceil(from/step)*step;t<now;t+=step)ticks.push(`<text x="${x(t)}" y="${H-6}" text-anchor="middle">${range===24?A.clock(t):new Date(t).toLocaleDateString('fr-FR',{weekday:'short'})}</text>`);
-    const lim=limits.map(l=>`<rect class="lim" x="${x(Math.max(l.from,from))}" y="${y(100)}" width="${Math.max(2,x(l.to??now)-x(Math.max(l.from,from)))}" height="${y(0)-y(100)}"/>`).join('');
-    const rs=resets.map(r=>`<line class="rst" x1="${x(r.t)}" x2="${x(r.t)}" y1="${y(100)}" y2="${y(0)}"/>`).join('');
-    const lines=segs.map(s=>s.length===1?`<circle cx="${x(s[0][0])}" cy="${y(s[0][1])}" r="2.5" class="pt"/>`:`<polyline points="${s.map(p=>x(p[0]).toFixed(1)+','+y(p[1]).toFixed(1)).join(' ')}"/>`).join('');
-    $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution de ${esc(A.METRICS[metric].label)}"><rect class="gap" x="${P}" y="${y(100)}" width="${W-P-8}" height="${y(0)-y(100)}"/>${grid}${lim}${rs}${lines}${ticks.join('')}</svg>`;
-    const ev=[...resets.map(r=>({t:r.t,txt:`Reset constaté (${Math.round(r.from)} % → ${Math.round(r.to)} %)`})),...limits.map(l=>({t:l.from,txt:`Limite atteinte${l.to?` jusqu’à ${A.dayClock(l.to)} environ`:' · en cours'}`}))].sort((a,b)=>b.t-a.t);
-    $('events').innerHTML=ev.length?'<ul>'+ev.slice(0,8).map(e=>`<li><time>${esc(A.dayClock(e.t))}</time>${esc(e.txt)}</li>`).join('')+'</ul>':'<p class="fine">Aucun reset ni limite constatés sur la période.</p>';
+    const total=Math.round(bars.reduce((s,b)=>s+b.used,0)),measured=bars.filter(b=>b.measured).length;
+    const unit=range===24?'heure':'jour',name=A.METRICS[metric].label;
+    $('history-summary').innerHTML=measured?`<b>${range===24?'Dernières 24 h':'7 derniers jours'} : ${total} % ${total>100?`(≈ ${(total/100).toLocaleString('fr-FR',{maximumFractionDigits:1})} fois le quota)`:''} de « ${esc(name)} » consommés.</b> Mesuré sur ${measured} ${unit}${measured>1?'s':''} sur ${bars.length}${limits.length?` · limite atteinte ${limits.length} fois`:''}${resets.length?` · ${resets.length} reset${resets.length>1?'s':''} constaté${resets.length>1?'s':''}`:''}.`:'Aucune mesure sur cette période.';
+    const W=640,H=200,P=34,B=24,max=Math.max(10,...bars.map(b=>b.used));
+    const top=max<=10?10:max<=25?25:max<=50?50:max<=100?100:Math.ceil(max/50)*50;
+    const slot=(W-P-8)/bars.length,y=v=>H-B-(v/top)*(H-B-12);
+    const grid=[0,top/2,top].map(v=>`<line x1="${P}" x2="${W-8}" y1="${y(v)}" y2="${y(v)}" class="g"/><text x="${P-6}" y="${y(v)+3}" text-anchor="end">${Math.round(v)} %</text>`).join('');
+    const rects=bars.map((b,i)=>{
+      const x=P+i*slot+slot*.15,w=Math.max(2,slot*.7);
+      const lim=limits.some(l=>l.from<b.t+bucket&&(l.to??now)>=b.t);
+      if(!b.measured)return `<rect class="nodata" x="${x}" y="${y(0)-3}" width="${w}" height="3"><title>${esc(range===24?A.clock(b.t):new Date(b.t).toLocaleDateString('fr-FR',{weekday:'long'}))} : aucune mesure</title></rect>`;
+      return `<rect class="use${lim?' lim':''}" x="${x}" y="${y(b.used)}" width="${w}" height="${Math.max(1,y(0)-y(b.used))}"><title>${esc(range===24?A.clock(b.t)+'–'+A.clock(b.t+bucket):new Date(b.t).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric'}))} : ${b.used} % consommés${lim?' · limite atteinte':''}</title></rect>`;
+    }).join('');
+    const every=range===24?6:1;
+    const labels=bars.map((b,i)=>i%every===0?`<text x="${P+i*slot+slot/2}" y="${H-6}" text-anchor="middle">${range===24?A.clock(b.t):new Date(b.t).toLocaleDateString('fr-FR',{weekday:'short'})}</text>`:'').join('');
+    $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Consommation de ${esc(name)} par ${unit}">${grid}${rects}${labels}</svg>`;
+    const ev=[...resets.map(r=>({t:r.t,txt:`Reset constaté (${Math.round(r.from)} % → ${Math.round(r.to)} %)`})),...limits.map(l=>({t:l.from,txt:`Limite atteinte${l.to?`, de nouveau disponible vers ${A.dayClock(l.to)}`:' · en cours'}`}))].sort((a,b)=>b.t-a.t);
+    $('events').innerHTML=ev.length?'<ul>'+ev.slice(0,8).map(e=>`<li><time>${esc(A.dayClock(e.t))}</time>${esc(e.txt)}</li>`).join('')+'</ul>':'';
   }
   function continuity(){
     const jobs=Object.values(extras.jobs).sort((a,b)=>a.at-b.at);

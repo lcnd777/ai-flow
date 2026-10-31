@@ -1,5 +1,7 @@
 # Connecteurs de quotas — ce qui est réellement lu
 
+Depuis la 0.8.2, AI Flow n’affiche que les IA dont les limites sont lisibles : **Claude, Codex et Grok**. Les autres lignes du tableau expliquent pourquoi elles ne sont pas proposées.
+
 Chaque plateforme est décrite dans `safari/platforms.js` : hôtes, limites, niveau de support et note. Son lecteur éventuel se trouve dans `safari/readers.js`. Un lecteur est une fonction autonome, exécutée **dans l'onglet officiel déjà ouvert** (`scripting.executeScript`, monde `MAIN`). Elle utilise donc la session de l'utilisateur sans qu'AI Flow voie ni stocke ses cookies ou jetons. Elle ne renvoie que des pourcentages, des dates de reset et un libellé court. Le background revalide tout (`sanitizeReadings`) avant d'écrire.
 
 | Plateforme | Niveau | Source | Limites | Vérifié |

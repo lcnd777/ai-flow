@@ -147,3 +147,22 @@ test('Relance : uniquement depuis une conversation, message borné',async()=>{
   assert.equal((await call('resumeArm',{at:Date.now()+1000,message:'x'},site(fb,'https://claude.ai/chat/a'))).ok,false);
   assert.equal((await call('resumeArm',{at:Date.now()+3600000,message:'x'},site(fb,'https://grok.com/'))).ok,false,'Grok : relance non prise en charge');
 });
+test('Safari sans app Mac : un appel natif sans réponse ne bloque plus rien',async()=>{
+  const {call,fb,A}=setup({native:true,nativeReply:()=>new Promise(()=>{})});
+  await call('settings',{awakeEnabled:true});
+  const t0=Date.now();
+  const status=call('awakeStatus');
+  const settings=await call('settings',{focusMode:false});
+  assert.equal(settings.ok,true);
+  assert.ok(Date.now()-t0<1500,'réglage enregistré sans attendre l’app Mac');
+  assert.equal(A.clean(fb.store[A.KEY]).settings.focusMode,false);
+  const opened=await call('openPage',{page:'options'});
+  assert.equal(opened.ok,true);
+  const s=await status;
+  assert.equal(s.ok,true);assert.equal(s.value.reachable,false,'app injoignable signalée, pas d’attente infinie');
+});
+test('Page de l’extension sans URL (popup Safari) reconnue',async()=>{
+  const {call}=setup();
+  const r=await call('settings',{focusMode:false},{id:'ext',frameId:0});
+  assert.equal(r.ok,true);
+});

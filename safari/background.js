@@ -6,7 +6,13 @@ const ALARM='ai-flow-refresh',ALARM_MINUTES=2,AUTO_MIN_GAP=60000,ACCOUNT_KEY='ai
 const PAGES={dashboard:'dashboard.html',options:'options.html',transfer:'transfer.html'};
 const EXT_PAGES=['popup.html','dashboard.html','options.html','transfer.html'];
 let queue=Promise.resolve();
-function serial(job){const r=queue.catch(()=>{}).then(job);queue=r.catch(()=>{});return r;}
+function within(promise,ms,fallback){let t;return Promise.race([promise,new Promise(res=>{t=setTimeout(()=>res(fallback),ms);})]).finally(()=>clearTimeout(t));}
+// Une tâche bloquée ne doit jamais figer les suivantes (Safari peut ne jamais répondre à un appel natif).
+function serial(job){
+  const r=queue.catch(()=>{}).then(job);
+  queue=within(r.catch(()=>{}),30000,undefined);
+  return r;
+}
 async function load(key,fallback){try{return (await api.storage.local.get(key))[key]??fallback;}catch{return fallback;}}
 async function save(key,value){await api.storage.local.set({[key]:value});}
 async function write(op,payload){const s=await A.getState();const v=A.reduce(s,op,payload);await api.storage.local.set({[A.KEY]:s});return {state:s,value:v};}
@@ -16,9 +22,9 @@ function senderSite(sender){
   try{const u=new URL(sender.url||'');if(u.protocol!=='https:')return null;return PL.siteFor(u.href);}catch{return null;}
 }
 function authorized(message,sender){
-  if(sender.id!==api.runtime.id||sender.frameId>0)throw Error('Origine non autorisée');
+  if((sender.id&&sender.id!==api.runtime.id)||sender.frameId>0)throw Error('Origine non autorisée');
   const url=sender.url||'';
-  if(EXT_PAGES.some(p=>url===api.runtime.getURL(p)||url.startsWith(api.runtime.getURL(p)+'?')||url.startsWith(api.runtime.getURL(p)+'#')))return 'page';
+  if(url.startsWith(api.runtime.getURL(''))||(!sender.tab&&!url))return 'page';
   const site=senderSite(sender);
   if(!site||!sender.tab)throw Error('Origine non autorisée');
   const {op,payload}=message;
@@ -153,7 +159,7 @@ async function badge(){
 function hasNative(){return !!api.runtime.getManifest?.().permissions?.includes('nativeMessaging')&&!!api.runtime.sendNativeMessage;}
 async function nativeCall(message){
   if(!hasNative())return null;
-  try{const r=await api.runtime.sendNativeMessage('ai.flow',message);return r&&typeof r==='object'?r:null;}catch{return null;}
+  try{const r=await within(api.runtime.sendNativeMessage('ai.flow',message),3000,null);return r&&typeof r==='object'?r:null;}catch{return null;}
 }
 async function notify(state){
   const {events,memo}=A.notificationEvents(await load(K.notify,null),state);
@@ -352,9 +358,12 @@ async function handle(message,sender){
     default:throw Error('Commande inconnue');
   }
 }
+const DIRECT_OPS=new Set(['openPage','openPlatform','connectionStatuses','awakeStatus']);
 api.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message?.type!=='AI_FLOW')return false;
-  serial(()=>handle(message,sender)).then(value=>reply({ok:true,value}),error=>reply({ok:false,error:error.message}));
+  // Ouvertures d'onglets et lectures : immédiates, sans attendre la file des écritures.
+  const run=DIRECT_OPS.has(message.op)?handle(message,sender):serial(()=>handle(message,sender));
+  run.then(value=>reply({ok:true,value}),error=>reply({ok:false,error:error?.message||String(error)}));
   return true;
 });
 api.alarms.onAlarm.addListener(alarm=>{

@@ -1,3 +1,19 @@
+## 0.8.2 — Boutons et réglages réparés sur Safari, IA non mesurables retirées, vraie consommation
+
+### Corrigé
+- **Safari : boutons et réglages sans effet.** Sans app Mac, Safari ne répondait jamais à la demande d’état d’Awake, et cette demande bloquait la file d’attente de l’arrière-plan. Tout ce qui suivait restait figé : « Actualiser » bloqué, toggles et flèches non enregistrés, boutons Ouvrir, Tableau de bord, Transférer et Paramètres inertes. Corrections :
+  - les appels natifs abandonnent au bout de 3 s ;
+  - une tâche bloquée libère la file après 30 s ;
+  - les ouvertures d’onglets et les lectures ne passent plus par la file ;
+  - toute demande échoue proprement après 12 s, avec un message ;
+  - les boutons d’ouverture ouvrent l’onglet directement si l’arrière-plan ne répond pas ;
+  - les pages de l’extension sont reconnues même quand Safari ne fournit pas leur URL.
+- **Historique** : les hausses rapprochées (moins d’une minute) étaient écrasées, ce qui sous-estimait la consommation.
+
+### Modifié
+- **IA sans limites lisibles retirées** : Gemini, GitHub Copilot, Cursor, Perplexity, Microsoft Copilot, et ChatGPT en tant que plateforme. Restent Claude, Codex et Grok. La pastille reste sur chatgpt.com pour Codex et la relance de conversation.
+- **« Historique » devient « Ma consommation »** : barres par heure (24 h) ou par jour (7 jours) de ce que tu as réellement consommé, en % du quota, avec un résumé (« 62 % de la session Claude consommés »), les limites atteintes et les heures sans mesure. L’ancien graphique montrait seulement le niveau de la jauge.
+
 ## 0.8.1 — Tout sans Xcode
 
 - **Awake en mode Terminal** : sans l’app Mac (donc sans Xcode), AI Flow calcule la commande macOS `caffeinate -i -t <secondes>` pour la relance programmée (jusqu’à 10 min après), avec un bouton Copier dans la pastille et dans Paramètres. Elle fonctionne aussi avec Chrome et Edge sur Mac. L’état indique « Mode Terminal » au lieu de « Indisponible ».

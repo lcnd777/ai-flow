@@ -47,8 +47,12 @@
     return out;
   }
   async function getState(){const v=await api.storage.local.get(KEY);return clean(v?.[KEY]);}
-  async function request(op,payload){
-    const response=await api.runtime.sendMessage({type:'AI_FLOW',op,payload});
+  async function request(op,payload,opts={}){
+    const ms=opts.timeout||12000;let timer;
+    const late=new Promise((_,rej)=>{timer=setTimeout(()=>rej(new Error('AI Flow ne répond pas. Recharge la page ; si ça persiste, quitte et relance Safari.')),ms);});
+    let response;
+    try{response=await Promise.race([api.runtime.sendMessage({type:'AI_FLOW',op,payload}),late]);}
+    finally{clearTimeout(timer);}
     if(!response?.ok)throw new Error(response?.error||'AI Flow indisponible. Recharge cette page.');
     return response.value;
   }
@@ -211,8 +215,8 @@
       if(!METRICS[r.id]||!validPercent(r.percent))continue;
       const s=h.series[r.id]||(h.series[r.id]=[]),last=s.at(-1);
       if(last&&r.percent+10<=last[1])h.resets.push({id:r.id,t:now,from:last[1],to:r.percent});
-      if(!last||now-last[0]>=10*60000||(last[1]!==r.percent&&now-last[0]>=60000))s.push([now,r.percent]);
-      else if(last[1]!==r.percent)last[1]=r.percent;
+      // Chaque changement est conservé (sinon une hausse serait perdue pour la consommation).
+      if(!last||last[1]!==r.percent||now-last[0]>=10*60000)s.push([now,r.percent]);
       const open=h.limits.find(l=>l.id===r.id&&l.to===null);
       if(r.percent>=LIMIT&&!open)h.limits.push({id:r.id,from:now,to:null});
       if(r.percent<LIMIT&&open)open.to=now;
@@ -228,6 +232,20 @@
     return out;
   }
 
+  // Consommation réelle : somme des hausses entre deux relevés (les resets ne comptent pas),
+  // rangée par tranche (heure ou jour). Une tranche sans relevé est marquée « non mesurée ».
+  function consumption(points,from,to,bucket,maxGap=5*3600000){
+    const n=Math.max(1,Math.ceil((to-from)/bucket)),out=Array.from({length:n},(_,i)=>({t:from+i*bucket,used:0,measured:false}));
+    const list=points.filter(p=>p[0]<=to).sort((a,b)=>a[0]-b[0]);
+    for(let i=0;i<list.length;i++){
+      const [t,p]=list[i];if(t<from)continue;
+      const b=out[Math.min(n-1,Math.floor((t-from)/bucket))];b.measured=true;
+      const prev=list[i-1];
+      if(prev&&p>prev[1]&&t-prev[0]<=maxGap)b.used+=p-prev[1];
+    }
+    for(const b of out)b.used=Math.round(b.used*10)/10;
+    return out;
+  }
   // ---------- Notifications (sans répétition) ----------
   function notificationEvents(rawMemo,state,now=Date.now()){
     const memo={sent:{},reached:{}};
@@ -314,6 +332,6 @@
 
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
-    pace,autonomy,platformAutonomy,autonomyText,fmtDuration,smartSwitch,cleanHistory,recordHistory,segments,notificationEvents,describeEvents,
+    pace,autonomy,platformAutonomy,autonomyText,fmtDuration,smartSwitch,cleanHistory,recordHistory,segments,consumption,notificationEvents,describeEvents,
     HANDOFF_FIELDS,buildHandoff,caffeinateCommand,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

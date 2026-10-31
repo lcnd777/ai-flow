@@ -37,7 +37,6 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     if(u.pathname==='/rest/rate-limits'){grokCalls++;return r.fulfill({json:{windowSizeSeconds:7200,remainingQueries:15,totalQueries:20}});}
     return r.fulfill({contentType:'text/html',body:page('Grok')});
   });
-  await ctx.route('https://gemini.google.com/**',r=>r.fulfill({contentType:'text/html',body:page('Gemini')}));
 
   let [sw]=ctx.serviceWorkers();if(!sw)sw=await ctx.waitForEvent('serviceworker');
   const id=new URL(sw.url()).host,E=p=>`chrome-extension://${id}/${p}`;
@@ -66,7 +65,6 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const pc=await ctx.newPage();await pc.goto('https://claude.ai/chat/abc-123');
   const pg=await ctx.newPage();await pg.goto('https://chatgpt.com/c/xyz');
   const pk=await ctx.newPage();await pk.goto('https://grok.com/');
-  const pm=await ctx.newPage();await pm.goto('https://gemini.google.com/app');
   await pc.bringToFront();await pc.waitForTimeout(4000);
   let st=await storage('ai_flow_state_v1');
   check('Lecture auto Claude sans clic (30 %)',st?.metrics?.['claude.session']?.percent===30,JSON.stringify(st?.metrics));
@@ -79,15 +77,15 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   await pop.goto(E('popup.html'));await pop.waitForTimeout(1200);
   const popText=await pop.locator('body').innerText();
   check('Popup : Claude 30 %',/Claude[\s\S]*30 %/.test(popText));
-  check('Popup : Codex distinct de ChatGPT',/Codex[\s\S]*41 %/.test(popText)&&/ChatGPT[\s\S]*Non mesuré/.test(popText));
-  check('Popup : Gemini non mesuré, sans chiffre',/Gemini[\s\S]*Non mesuré/.test(popText));
+  check('Popup : Codex affiché avec ses quotas',/Codex[\s\S]*41 %/.test(popText));
+  check('Popup : IA sans limites lisibles retirées (ChatGPT, Gemini…)',!/Gemini|Non mesuré|Perplexity/.test(popText)&&!/\bChatGPT\b/.test(popText.replace(/ChatGPT \(Codex\)/g,'')));
   check('Popup : dernière actualisation visible',/Actualisé à \d\d:\d\d/.test(popText));
   check('Popup : « Prévoir ma session » retiré',!/Prévoir ma session|AI Runway/.test(popText));
   await pop.screenshot({path:path.join(shots,'popup-dark.png')});
   const wc=text((await widget(pc)).html);
   check('Pastille Claude = popup (30 %)',/30 % utilisés|Pas d’alerte/.test(wc),wc.slice(0,200));
   const wg=text((await widget(pg)).html);
-  check('Pastille ChatGPT : Codex chiffré, ChatGPT non mesuré',/Codex · 41 % utilisés|Pas d’alerte/.test(wg)&&/n’expose pas les limites de messages/.test(wg),wg.slice(0,300));
+  check('Pastille ChatGPT : Codex chiffré, sans bloc « non mesuré »',/Codex · 41 % utilisés|Pas d’alerte/.test(wg)&&!/n’expose pas les limites de messages/.test(wg),wg.slice(0,300));
 
   // 3. Navigation du popup : vrais onglets, non épinglés.
   for(const [label,file] of [['Paramètres','options.html'],['Tableau de bord','dashboard.html'],['Transférer','transfer.html']]){
@@ -104,12 +102,15 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   // 4. Paramètres : masquer, réordonner, Awake indisponible hors Safari.
   const opt=ctx.pages().find(p=>p.url().startsWith(E('options.html')));
   await opt.bringToFront();await opt.setViewportSize({width:1100,height:900});await opt.waitForTimeout(500);
-  await opt.locator('[data-visible="gemini"]').uncheck();await opt.waitForTimeout(300);
+  await opt.locator('[data-visible="grok"]').uncheck();await opt.waitForTimeout(400);
+  const hidden=(await storage('ai_flow_state_v1')).settings.platformHidden.grok===true;
+  await opt.locator('[data-visible="grok"]').check();await opt.waitForTimeout(400);
   await opt.locator('[data-move="grok"][data-dir="-1"]').click();await opt.waitForTimeout(300);
   await opt.locator('[data-setting="awakeEnabled"]').check();await opt.waitForTimeout(800);
   check('Awake hors Mac : indisponible, pas de commande Terminal',/Indisponible sur cet appareil/.test(await opt.locator('#awake-state').innerText())&&await opt.locator('#awake-terminal').isHidden());
   st=await storage('ai_flow_state_v1');
-  check('Paramètres : Gemini masquée',st.settings.platformHidden.gemini===true);
+  check('Paramètres : masquer / réafficher une IA enregistré',hidden&&!st.settings.platformHidden.grok);
+  check('Paramètres : seules les IA mesurables listées',await opt.locator('.prow').count()===3);
   check('Paramètres : ordre modifié',st.settings.platformOrder.indexOf('grok')<st.settings.platformOrder.indexOf('codex'));
   check('Paramètres : Awake activable, état « indisponible » hors Safari',/Indisponible/.test(await opt.locator('#awake-state').innerText()));
   await opt.locator('[data-setting="notifyApproaching"]').uncheck();await opt.waitForTimeout(300);
@@ -143,7 +144,9 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const dText=await dash.locator('body').innerText();
   check('Tableau de bord : Smart Switch propose Codex/Grok (capacité confirmée)',/Smart Switch[\s\S]*Claude approche de sa limite[\s\S]*Capacité confirmée/i.test(dText)&&/Codex/.test(dText));
   check('Tableau de bord : autonomie estimée signalée comme estimation',/À ton rythme actuel|ne devrait pas être atteinte/.test(dText)&&/Estimation/.test(dText),dText.slice(0,600));
-  check('Tableau de bord : historique tracé',await dash.locator('#chart svg polyline, #chart svg circle').count()>0);
+  check('Tableau de bord : consommation tracée en barres',await dash.locator('#chart svg rect.use').count()>0&&/consommés/.test(await dash.locator('#history-summary').innerText()),await dash.locator('#history-summary').innerText());
+  await dash.locator('#refresh').click();await dash.waitForFunction(()=>document.getElementById('refresh').textContent==='Actualiser',null,{timeout:15000}).catch(()=>{});
+  check('Tableau de bord : « Actualiser » fonctionne et revient à l’état normal',(await dash.locator('#refresh').innerText())==='Actualiser'&&await dash.locator('#refresh').isEnabled());
   await dash.screenshot({path:path.join(shots,'dashboard.png'),fullPage:true});
   const toasts=await storage('ai_flow_toast_v1');
   check('Notification « approche de sa limite » une seule fois',(toasts||[]).filter(t=>t.type==='approaching'&&t.platform==='claude').length===1,JSON.stringify(toasts));
