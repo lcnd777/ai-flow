@@ -339,7 +339,12 @@
      'calm' = rien ne presse, autres plateformes disponibles (affichage discret). null = rien à proposer. */
   function switchOffer(state,now=Date.now(),current=null){
     const sw=smartSwitch(state,now,current);
-    if(sw.pressured.length)return {mode:'pressured',...sw};
+    if(sw.pressured.length){
+      // Toutes les plateformes mesurées ont atteint leur limite : aucune alternative, donc pas de Smart Switch.
+      const all=visiblePlatforms(state).map(p=>platformStatus(state,p,now)).filter(st=>st.level!=='unmeasured');
+      if(!sw.available.length&&all.length&&all.every(st=>st.limitReached))return {mode:null,risky:[],...sw,available:[]};
+      return {mode:'pressured',...sw};
+    }
     const pool=current?[current]:visiblePlatforms(state);
     const risky=pool.filter(p=>{const r=platformRunway(state,p,now);return r&&runwayWorthShowing(r)&&(r.kind==='risk'||r.kind==='risk-uncertain');});
     const alts=sw.available.filter(s=>s.platform!==current&&!risky.includes(s.platform));

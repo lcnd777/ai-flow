@@ -114,4 +114,9 @@ test('Smart Switch : visible dès qu’une autre plateforme est disponible, disc
   assert.equal(A.switchOffer(s,now,'claude').mode,'pressured');
   s=A.clean({metrics:{'claude.session':m(40,3*H)}});
   assert.equal(A.switchOffer(s,now,'claude').mode,null,'aucune autre plateforme disponible : rien');
+  s=A.clean({metrics:{'claude.session':m(100,3*H),'codex.session':m(100,4*H)}});
+  assert.equal(A.switchOffer(s,now,'claude').mode,null,'toutes les limites atteintes : pas de Smart Switch');
+  assert.equal(A.switchOffer(s,now,null).mode,null);
+  s=A.clean({metrics:{'claude.session':m(100,3*H),'codex.session':m(5,4*H)}});
+  assert.equal(A.switchOffer(s,now,'claude').mode,'pressured','une autre plateforme reste disponible');
 });

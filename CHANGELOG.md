@@ -1,3 +1,7 @@
+## 0.13.2 — Smart Switch masqué quand tout est à la limite
+
+- Le Smart Switch ne s’affiche plus lorsque toutes les plateformes mesurées ont atteint leur limite (aucune alternative à proposer). Il reste affiché si une autre plateforme est disponible ou si son état est inconnu.
+
 ## 0.13.1 — Consommation par plateforme, Smart Switch toujours disponible, fiabilité de la synchronisation
 
 ### Smart Switch
