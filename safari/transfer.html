@@ -7,7 +7,7 @@
       <button type="button" data-open-page="options" class="ghost">Paramètres</button>
     </nav>
   </header>
-  <main class="page-main">
+  <main class="page-main" id="transfer-view">
     <section class="hero"><h1 id="page-title">Continue ailleurs, sans perdre le fil.</h1>
       <p class="lead">AI Flow prépare un message de reprise : l’essentiel de ton travail et les derniers échanges, dans l’ordre. Tu relis et modifies tout avant l’envoi. Rien n’est lu sans ton clic, rien n’est envoyé à ta place.</p></section>
 
@@ -45,7 +45,9 @@
         <textarea id="preview" spellcheck="true" aria-label="Message de reprise modifiable" placeholder="Récupère une conversation depuis la fenêtre AI Flow ou remplis au moins un champ."></textarea>
         <p class="fine"><span id="count">0</span> · retire les informations sensibles avant l’envoi.</p>
         <p id="size-warn" class="fine" role="status"></p>
+        <p id="secret-warn" class="fine warn" hidden><span></span> <button type="button" id="mask-secrets" class="ghost small">Masquer</button></p>
         <label class="mini-check"><input type="checkbox" id="auto-insert" checked> Insérer automatiquement dans la zone de saisie (sans l’envoyer)</label>
+        <label class="mini-check" id="link-row" hidden><input type="checkbox" id="link-flow"> Lier ces conversations pour synchroniser les prochaines avancées</label>
         <div class="row-actions">
           <button type="button" id="go" class="primary">Ouvrir et insérer</button>
           <button type="button" id="copy" class="ghost">Copier</button>
@@ -56,5 +58,47 @@
       </section>
     </div>
   </main>
-  <script src="platforms.js"></script><script src="shared.js"></script><script src="ui.js"></script><script src="transfer.js"></script>
+  <main class="page-main" id="sync-view" hidden>
+    <section class="hero"><h1>Synchroniser les avancées</h1>
+      <p class="lead">Seules les nouveautés depuis la dernière synchronisation confirmée sont préparées. Tu choisis ce qui part, tu relis, tu envoies toi-même.</p></section>
+    <section class="panel" id="sync-head" aria-live="polite"></section>
+    <section class="panel" id="sync-open" hidden></section>
+    <section class="panel" id="sync-step">
+      <div class="sec-head"><h2>Avancées détectées</h2><button type="button" id="sync-run" class="primary small">Récupérer les avancées</button></div>
+      <p id="sync-summary" class="fine" role="status">Clique « Récupérer les avancées » : AI Flow lit la conversation source maintenant, sur ce clic uniquement.</p>
+      <ul id="sync-warn" class="sync-warn"></ul>
+      <div id="sync-conflicts"></div>
+      <div id="sync-items"></div>
+    </section>
+    <section class="panel preview" id="sync-preview" hidden>
+      <div class="sec-head"><h2>Message de mise à jour</h2><button type="button" id="sync-regen" class="ghost small" hidden>Régénérer</button></div>
+      <div class="row-actions wrap">
+        <label class="mini-check"><input type="checkbox" id="sync-mask" checked> Masquer les secrets détectés</label>
+        <label class="mini-check"><input type="checkbox" id="sync-transcript"> Joindre les nouveaux échanges (texte)</label>
+      </div>
+      <textarea id="sync-packet" spellcheck="true" aria-label="Message de mise à jour modifiable"></textarea>
+      <p class="fine" id="sync-size"></p>
+      <p class="fine warn" id="sync-block" role="status" hidden></p>
+      <div class="row-actions">
+        <button type="button" id="sync-insert" class="primary">Insérer dans la conversation</button>
+        <button type="button" id="sync-copy" class="ghost">Copier</button>
+      </div>
+      <div id="sync-after" class="sync-after" hidden>
+        <p id="sync-state" class="fine" role="status"></p>
+        <div class="row-actions">
+          <button type="button" id="sync-confirm" class="primary small">J’ai envoyé le message — confirmer</button>
+          <button type="button" id="sync-retry" class="ghost small" hidden>Réessayer l’insertion</button>
+          <button type="button" id="sync-cancel" class="ghost small">Annuler cette synchronisation</button>
+        </div>
+      </div>
+    </section>
+    <section class="panel">
+      <details id="sync-history"><summary>Historique et décisions du Flow</summary><div id="sync-ledger"></div><div id="sync-decisions"></div></details>
+      <div class="row-actions">
+        <button type="button" id="sync-unlink" class="ghost small">Dissocier ces conversations</button>
+        <button type="button" id="sync-delete" class="ghost small danger">Supprimer le Flow et son point de reprise</button>
+      </div>
+    </section>
+  </main>
+  <script src="platforms.js"></script><script src="shared.js"></script><script src="sync.js"></script><script src="ui.js"></script><script src="transfer.js"></script><script src="sync-view.js"></script>
 </body></html>

@@ -1,3 +1,28 @@
+## 0.13.0 — Smart Context Sync
+
+Travailler → changer d’IA → continuer → **synchroniser les avancées** → reprendre sans réexpliquer. Détails : [docs/SMART-CONTEXT-SYNC.md](docs/SMART-CONTEXT-SYNC.md).
+
+### Phase 1 — Infrastructure et MVP
+- **Lier deux conversations** lors d’un transfert (case « Lier ces conversations pour synchroniser les prochaines avancées », décochée par défaut). Le Flow naît quand la conversation de destination existe ; les points de reprise déjà reliés peuvent être liés depuis le tableau de bord. Dissociation à tout moment.
+- **Comparaison incrémentale déterministe** : identifiants de messages (Claude, ChatGPT) puis empreintes du contenu ; seuls les messages nouveaux ou modifiés depuis la dernière synchronisation confirmée sont repris ; les messages insérés par AI Flow sont ignorés ; un message absent n’est jamais considéré comme supprimé.
+- **Prévisualisation** dans la page de transfert : nouveautés, décisions, tâches terminées, problèmes restants, prochaines étapes, éléments non récupérés ; chaque élément peut être exclu ou modifié, avec son extrait source.
+- **Transfert validé** : message « [AI Flow · Mise à jour de contexte] » inséré sans envoi dans la conversation liée (onglet existant réutilisé) ou copié.
+- **Journal** : Préparée, En attente d’insertion, Insérée, Confirmée, Annulée, Échouée. Seule la confirmation fait avancer le point de référence et le point de reprise.
+- Données versionnées, données corrompues mises de côté sans effacement silencieux.
+
+### Phase 2 — Synchronisation intelligente
+- **Décisions suivies** : proposées (par l’IA), validées (par toi), modifiées, abandonnées, en conflit. Une décision validée remplace une proposition contraire ; une proposition ne redevient jamais une décision validée.
+- **Conflits** : conserver la première, la seconde, fusionner manuellement ou reporter le choix ; transmission bloquée tant qu’un conflit important n’est pas tranché. Comparaison à trois états quand les deux conversations ont évolué.
+- **Captures incomplètes** signalées (page affichée, aucun repère commun, première synchronisation, compte différent).
+- **Concurrence** : confirmation d’une préparation devenue périmée refusée ; nouvelle préparation qui remplace l’ancienne.
+
+### Phase 3 — Expérience avancée
+- **Fenêtre AI Flow** : sur une conversation liée, « Synchroniser » (affiche « À jour » s’il n’y a rien de nouveau) et « Voir les détails ».
+- **Pastille** : bouton « Synchroniser » sur les conversations liées. **Flow Recovery** : un travail repris propose les avancées faites sur l’autre IA.
+- **Tableau de bord** : conversations liées, dernière synchronisation, décisions validées et à arbitrer, Dissocier / Supprimer.
+- **Confidentialité** : décisions et brouillons chiffrés localement (AES-GCM, clé non extractible) ; secrets évidents détectés et masqués (aussi dans Smart Transfer).
+- Interface tactile (Safari iPhone / iPad) : cibles de 44 px, une colonne sur petit écran. Aucune notification liée à la synchronisation.
+
 ## 0.12.3 — Retrait des quotas dans la barre de menus
 
 - Les quotas dans la barre de menus macOS sont retirés : ils ne s’affichaient pas sur le Mac de test et la cause n’a pas pu être établie avec certitude. L’icône ⚡ garde les mises à jour, le maintien éveillé et les réglages. Les données associées sont supprimées automatiquement.

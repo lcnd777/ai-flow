@@ -69,3 +69,9 @@ Sans app Mac, Safari ne répond jamais à un appel natif, ce que Chromium ne rep
 - Intégration Chromium (sites simulés) : **57 / 57**, dont extraction automatique, pièce jointe signalée, taille estimée, suggestion de point de reprise et bouton dans la pastille.
 - Compilation macOS dans le cloud : validée par la CI, avec lancement de l’app pendant 10 s.
 - Non vérifié : conversations et pièces jointes des vrais sites, affichage réel de la barre de menus.
+
+## Ajouts 0.13.0 — Smart Context Sync
+
+- **Tests unitaires** : 109/109 (dont 20 pour Smart Context Sync : delta, doublons, modifications, captures partielles, décisions, conflits et leur résolution, trois états, secrets, journal, concurrence, échec puis nouvelle tentative, confirmation non reçue, annulation, permission refusée, conversation supprimée, suppression d’un Flow, chiffrement, absence de chiffrement, migration et données corrompues).
+- **Chromium (extension réelle, sites Claude et ChatGPT SIMULÉS)** : 83/83, dont le parcours complet : transfert avec liaison → Flow créé → « Synchroniser » dans la pastille → 2 nouveaux messages, transfert initial ignoré → décision « Remplace » la proposition → exclusion d’un élément → insertion dans la conversation Claude liée sans envoi → « Insérée, à confirmer » → confirmation → « À jour » → conflit avec 4 choix, transmission bloquée puis « À arbitrer ».
+- **Non vérifié ici** : aucune session Claude ou ChatGPT authentifiée n’a été utilisée ; le format réel des identifiants de messages, l’insertion dans les vraies zones de saisie et l’affichage sur Safari Mac / iPhone / iPad restent à vérifier sur ton appareil.

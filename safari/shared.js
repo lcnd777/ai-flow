@@ -6,7 +6,7 @@
   const KEY='ai_flow_state_v1';
   const KEYS={history:'ai_flow_history_v2',diag:'ai_flow_diagnostics_v1',auto:'ai_flow_auto_refresh_v1',resume:'ai_flow_resume_v1',
     resumeLast:'ai_flow_resume_last_v1',drafts:'ai_flow_drafts_v1',toast:'ai_flow_toast_v1',seed:'ai_flow_transfer_seed_v1',
-    notify:'ai_flow_notify_v1',awake:'ai_flow_awake_v1',dismiss:'ai_flow_resume_dismissed_v1',capture:'ai_flow_capture_v1'};
+    notify:'ai_flow_notify_v1',awake:'ai_flow_awake_v1',dismiss:'ai_flow_resume_dismissed_v1',capture:'ai_flow_capture_v1',flows:'ai_flow_flows_v1',flowsQuarantine:'ai_flow_flows_quarantine_v1'};
   const api=typeof browser!=='undefined'?browser:typeof chrome!=='undefined'?chrome:null;
   const METRICS=PL.METRICS;
   const FRESH_MS=15*60000,LATE_MS=5*60000,DAY=86400000;
@@ -493,7 +493,8 @@
         fields:d.fields&&typeof d.fields==='object'?d.fields:{},preview:typeof d.preview==='string'?d.preview.slice(0,200000):'',
         createdAt:Number.isFinite(d.createdAt)?d.createdAt:Date.now(),updatedAt:Number.isFinite(d.updatedAt)?d.updatedAt:(Number.isFinite(d.createdAt)?d.createdAt:Date.now()),
         resetAt:Number.isFinite(d.resetAt)?d.resetAt:null,status:['open','ready','waiting','done'].includes(d.status)?d.status:'open',
-        destUrl:PL.conversationOf(d.destUrl||'')?.url||null,interrupted:d.kind==='interruption'||d.interrupted===true});
+        destUrl:PL.conversationOf(d.destUrl||'')?.url||null,interrupted:d.kind==='interruption'||d.interrupted===true,
+        syncedAt:Number.isFinite(d.syncedAt)?d.syncedAt:null});
     }
     return out.sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,50);
   }
@@ -531,5 +532,5 @@
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
     runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,smartSwitch,notificationEvents,describeEvents,
-    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,cleanCheckpoints,timelineItems,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
+    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,cleanCheckpoints,timelineItems,CONTINUITY_RX:RX,splitSentences:sentences,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

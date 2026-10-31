@@ -1,7 +1,7 @@
 (async function(){
   'use strict';
   const A=window.AIFlow,U=window.AIFlowUI,$=id=>document.getElementById(id),esc=A.escapeHTML;
-  let state,conn={},extras=await U.loadExtras(),awake=null,range=24,metric=null,sel=-1,bars=[],geom=null;
+  let state,conn={},extras=await U.loadExtras(),awake=null,range=24,metric=null,sel=-1,bars=[],geom=null,flowData={flows:[],quarantined:0};
   try{state=await A.getState();}catch(e){$('summary').textContent=e.message;return;}
 
   function summary(){
@@ -94,10 +94,18 @@
     if(extras.last)$('jobs').innerHTML+=`<p class="fine">Dernière relance : ${esc(extras.last.status)} · ${esc(A.dayClock(extras.last.at))}</p>`;
     const a=U.awakeText(awake);
     $('awake').innerHTML=`<span>Si le Mac dort</span><b class="${a.cls}">${esc(a.text)}</b>`;
+    const pn=id=>A.platform(id)?.name||'';
+    $('flows').innerHTML=(flowData.flows.length?flowData.flows.map(f=>{
+      const st=U.flowState(f),[a,b]=f.ends,dec=f.decisions.filter(d=>d.status==='validated').length,conf=f.decisions.filter(d=>d.status==='conflict').length;
+      const go=e=>`<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({sync:f.id,from:e.url}))}'>Depuis ${esc(pn(e.platform))}</button>`;
+      return `<div class="cline ${st.pending?'ready':''}">${U.logo(a.platform,'sm')}<div><b>${esc(f.title)}</b><small>${esc(pn(a.platform))} « ${esc(a.title)} » ⇄ ${esc(pn(b.platform))} « ${esc(b.title)} » · <span class="${st.pending?'warn':''}">${esc(st.text)}</span>${dec?` · ${dec} décision${dec>1?'s':''} validée${dec>1?'s':''}`:''}${conf?` · <span class="warn">${conf} à arbitrer</span>`:''}${f.locked?' · <span class="warn">décisions illisibles sur cette installation</span>':''}</small></div>
+        ${go(a)}${go(b)}<button class="ghost small" data-unlink="${esc(f.id)}">Dissocier</button><button class="ghost small" data-flowdel="${esc(f.id)}">Supprimer</button></div>`;
+    }).join(''):'<p class="fine">Aucune conversation liée. Lors d’un transfert, coche « Lier ces conversations » pour synchroniser ensuite seulement les avancées.</p>')
+      +(flowData.quarantined?`<p class="fine warn">${flowData.quarantined} Flow${flowData.quarantined>1?'s':''} illisible${flowData.quarantined>1?'s':''} mis de côté (données locales endommagées) : rien n’a été effacé.</p>`:'');
     const tl=A.timelineItems(extras.drafts,state);
     $('drafts').innerHTML=tl.length?tl.map(d=>{
       return `<div class="cline ${d.ready?'ready':''}">${U.logo(d.source||'claude','sm')}<div><b>${esc(d.title)}</b><small>${esc(d.label)} · ${esc(A.dayClock(d.updatedAt))}${d.source?' · '+esc(A.platform(d.source)?.name||''):''}${d.fields?.next?' · Prochaine étape : '+esc(String(d.fields.next).replace(/^- /,'').split('\n')[0].slice(0,60)):''}</small></div>
-        ${d.url?`<button class="${d.ready?'primary':'ghost'} small" data-open-url="${esc(d.id)}">Reprendre</button>`:''}${d.destUrl?`<button class="ghost small" data-dest="${esc(d.destUrl)}">Continuer sur ${esc(A.platform(d.target)?.name||'l’autre IA')}</button>`:''}<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>Modifier / transférer</button><button class="ghost small" data-done="${esc(d.id)}">Terminé</button><button class="ghost small" data-del="${esc(d.id)}" aria-label="Supprimer">Supprimer</button></div>`;
+        ${d.url?`<button class="${d.ready?'primary':'ghost'} small" data-open-url="${esc(d.id)}">Reprendre</button>`:''}${d.destUrl?`<button class="ghost small" data-dest="${esc(d.destUrl)}">Continuer sur ${esc(A.platform(d.target)?.name||'l’autre IA')}</button>`:''}<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>Modifier / transférer</button>${d.url&&d.destUrl&&!U.flowOf(flowData.flows,d.url)&&!U.flowOf(flowData.flows,d.destUrl)?`<button class="ghost small" data-link="${esc(d.id)}" title="Synchroniser ensuite seulement les avancées entre ces deux conversations">Lier</button>`:''}<button class="ghost small" data-done="${esc(d.id)}">Terminé</button><button class="ghost small" data-del="${esc(d.id)}" aria-label="Supprimer">Supprimer</button></div>`;
     }).join(''):'<p class="fine">Rien pour l’instant. Quand une limite interrompt une conversation, elle apparaît ici, avec « Reprendre » dès que le quota rouvre. Tu peux aussi créer un point de reprise depuis la fenêtre AI Flow.</p>';
   }
   function render(){
@@ -109,13 +117,18 @@
     chart();continuity();U.bindNav(document);
     for(const b of document.querySelectorAll('[data-cancel]'))b.onclick=async()=>{b.disabled=true;try{await A.request('resumeCancel',{id:b.dataset.cancel});}catch{}await reload();};
     for(const b of document.querySelectorAll('[data-del]'))b.onclick=async()=>{if(!confirm('Supprimer ce point de reprise ?'))return;await U.saveDrafts(A.cleanCheckpoints(extras.drafts).filter(d=>d.id!==b.dataset.del));await reload();};
+    for(const b of document.querySelectorAll('[data-link]'))b.onclick=async()=>{
+      if(!confirm('Lier ces deux conversations ? AI Flow pourra ensuite, sur ton clic, préparer uniquement les avancées de l’une pour l’autre. La première synchronisation considérera tout comme nouveau.'))return;
+      try{await A.request('flowLinkCheckpoint',{checkpointId:b.dataset.link});}catch(e){alert(e.message);}await reload();};
+    for(const b of document.querySelectorAll('[data-unlink]'))b.onclick=async()=>{if(!confirm('Dissocier ces conversations ? Le suivi des avancées et des décisions est supprimé ; le point de reprise est conservé.'))return;try{await A.request('flowUnlink',{flowId:b.dataset.unlink});}catch{}await reload();};
+    for(const b of document.querySelectorAll('[data-flowdel]'))b.onclick=async()=>{if(!confirm('Supprimer ce Flow, ses décisions, son historique et son point de reprise ?'))return;try{await A.request('flowDelete',{flowId:b.dataset.flowdel});}catch{}await reload();};
     for(const b of document.querySelectorAll('[data-dest]'))b.onclick=()=>U.openUrl(b.dataset.dest);
     for(const b of document.querySelectorAll('[data-done]'))b.onclick=async()=>{const list=A.cleanCheckpoints(extras.drafts),d=list.find(x=>x.id===b.dataset.done);if(!d)return;d.status='done';d.updatedAt=Date.now();await U.saveDrafts(list);await reload();};
     for(const b of document.querySelectorAll('[data-open-url]'))b.onclick=async()=>{const list=A.cleanCheckpoints(extras.drafts),d=list.find(x=>x.id===b.dataset.openUrl);if(!d)return;d.status='done';d.updatedAt=Date.now();await U.saveDrafts(list);await U.openUrl(d.url);await reload();};
   }
   async function reload(){
     try{state=await A.getState();}catch{}
-    extras=await U.loadExtras();
+    extras=await U.loadExtras();flowData=await U.loadFlows();
     try{conn=await A.request('connectionStatuses');}catch{}
     render();
   }

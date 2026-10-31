@@ -1,7 +1,7 @@
 (async function(){
   'use strict';
   const A=window.AIFlow,U=window.AIFlowUI,PL=window.AIFlowPlatforms,$=id=>document.getElementById(id),esc=A.escapeHTML;
-  let state,conn={},extras={jobs:{},drafts:[]},awake=null,active=null,busy='';
+  let state,conn={},extras={jobs:{},drafts:[]},awake=null,active=null,busy='',flows=[];
   {const m=A.api.runtime.getManifest();if(/dev/i.test(m.version_name||''))$('ver').textContent=m.version_name;}
   try{state=await A.getState();}catch(e){$('platforms').textContent=e.message;return;}
   // Onglet actif : quelle IA j'utilise en ce moment ?
@@ -17,7 +17,14 @@
     const info=A.runwayWorthShowing(run)?A.runwayText(run):st.fresh.length?`${Math.round(st.worst)} % utilisés · ${A.formatReset(state.metrics[st.worstId]?.resetAt)}`:'Quota en cours de lecture…';
     const label=active.site==='chatgpt'?'Tu es sur ChatGPT (quotas Codex)':`Tu utilises ${A.platform(active.platform).name}`;
     const actions=PL.transferable(active.url)?`<div class="now-actions"><button class="primary small" id="do-transfer">Transférer cette conversation</button><button class="ghost small" id="do-checkpoint">Point de reprise</button></div>`:'';
-    return `<section class="nowbar">${U.logo(active.site==='chatgpt'?'chatgpt':active.platform)}<div><b>${esc(label)}</b><small>${esc(info)}</small></div></section>${actions}${busy?`<p class="fine" role="status">${esc(busy)}</p>`:''}`;
+    return `<section class="nowbar">${U.logo(active.site==='chatgpt'?'chatgpt':active.platform)}<div><b>${esc(label)}</b><small>${esc(info)}</small></div></section>${actions}${flowCard()}${busy?`<p class="fine" role="status">${busy}</p>`:''}`;
+  }
+  // Smart Context Sync : conversation active liée à une autre IA → « Synchroniser » et « Voir les détails ».
+  function flowCard(){
+    const f=PL.transferable(active.url)&&U.flowOf(flows,active.url);if(!f)return '';
+    const me=PL.conversationOf(active.url).url,other=f.ends.find(e=>e.url!==me),st=U.flowState(f);
+    return `<div class="flow-card"><b>Flow · ${esc(f.title)}</b><small>Lié à ${esc(A.platform(other.platform).name)} « ${esc(other.title)} » · <span class="${st.pending?'warn':''}">${esc(st.text)}</span></small>
+      <div class="row-actions"><button class="primary small" id="do-sync" data-flow="${esc(f.id)}">Synchroniser</button><button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({sync:f.id,from:me}))}'>Voir les détails</button></div></div>`;
   }
   function continuity(){
     const rows=[],now=Date.now();
@@ -30,7 +37,10 @@
       const act=d.ready&&d.url?`<button class="primary small" data-resume="${esc(d.id)}">Reprendre</button>`
         :d.destUrl?`<button class="ghost small" data-url="${esc(d.destUrl)}">Continuer</button>`
         :`<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>${d.interrupted?'Transférer':'Ouvrir'}</button>`;
-      rows.push(`<div class="cline ${d.ready?'ready':''}">${U.logo(d.source||'claude','sm')}<div><b>${esc(d.title)}</b><small>${esc(d.label)} · ${esc(A.dayClock(d.updatedAt))}</small></div>${act}</div>`);
+      // Flow Recovery : avant de reprendre, proposer les avancées faites entre-temps sur l'autre IA.
+      const f=d.url&&U.flowOf(flows,d.url),other=f&&f.ends.find(e=>e.url!==d.url);
+      const sync=other?`<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({sync:f.id,from:other.url,auto:'1'}))}' title="Synchroniser les avancées de ${esc(A.platform(other.platform).name)}">Avancées ${esc(A.platform(other.platform).name)}</button>`:'';
+      rows.push(`<div class="cline ${d.ready?'ready':''}">${U.logo(d.source||'claude','sm')}<div><b>${esc(d.title)}</b><small>${esc(d.label)} · ${esc(A.dayClock(d.updatedAt))}${f?' · lié':''}</small></div>${sync}${act}</div>`);
     }
     if(items.length>3)rows.push(`<p class="fine"><a href="#" data-open-page="dashboard">${items.length-3} autre${items.length>4?'s':''} dans la Flow Timeline ›</a></p>`);
     return rows.length?`<section class="continuity"><h2>Continuité</h2>${rows.join('')}</section>`:'';
@@ -56,6 +66,18 @@
     };
     $('do-transfer')?.addEventListener('click',()=>capture('transfer'));
     $('do-checkpoint')?.addEventListener('click',()=>capture('checkpoint'));
+    $('do-sync')?.addEventListener('click',()=>quickSync($('do-sync').dataset.flow));
+  }
+  // Détection sur clic : « À jour » directement dans la fenêtre, sinon prévisualisation détaillée.
+  async function quickSync(flowId){
+    const from=PL.conversationOf(active.url).url;
+    busy='Recherche des avancées…';render();
+    try{
+      const r=await A.request('syncCapture',{flowId,from},{timeout:30000});
+      if(r.error){busy=esc(r.error.message);render();return;}
+      if(r.delta?.upToDate){busy=`<b class="ok">À jour</b> · aucune avancée depuis la dernière synchronisation${r.delta.partial?' (capture partielle : messages non chargés non vérifiés)':''}.`;render();return;}
+      busy='';await U.openPage('transfer',{sync:flowId,from,auto:'1'});
+    }catch(e){busy=esc(e.message);render();}
   }
   // Lecture de la conversation : uniquement sur ce clic, uniquement l'onglet actif.
   async function capture(kind){
@@ -64,13 +86,13 @@
       await A.request('captureConversation',{tabId:active.tabId},{timeout:20000});
       await U.openPage('transfer',kind==='checkpoint'?{capture:'1',mode:'checkpoint'}:{capture:'1'});
     }catch(e){
-      busy=e.message;render();
+      busy=esc(e.message);render();
       await U.openPage('transfer',{...(kind==='checkpoint'?{mode:'checkpoint'}:{}),from:active.site,why:'err',err:String(e.message||'').slice(0,180)});
     }
   }
   async function reload(){
     try{state=await A.getState();}catch{}
-    extras=await U.loadExtras();
+    extras=await U.loadExtras();flows=(await U.loadFlows()).flows;
     try{conn=await A.request('connectionStatuses');}catch{}
     render();
   }

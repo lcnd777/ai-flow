@@ -152,11 +152,13 @@
       const orgs=await get('/api/organizations');
       const list=(Array.isArray(orgs)?orgs:orgs?.organizations||[]).filter(o=>Array.isArray(o?.capabilities)&&o.capabilities.includes('chat'));
       if(list.length!==1)return fromDom();
-      const c=await get(`/api/organizations/${list[0].uuid}/chat_conversations/${m[1]}?tree=True&rendering_mode=messages&render_all_tools=true`);
+      let c;
+      try{c=await get(`/api/organizations/${list[0].uuid}/chat_conversations/${m[1]}?tree=True&rendering_mode=messages&render_all_tools=true`);}
+      catch(st){if(st===404||st===403)return {status:'not-found'};throw st;}
       const raw=Array.isArray(c?.chat_messages)?c.chat_messages:[];
       const text=x=>clip(typeof x?.text==='string'&&x.text?x.text:Array.isArray(x?.content)?x.content.filter(b=>b?.type==='text'&&typeof b.text==='string').map(b=>b.text).join('\n\n'):'');
       const names=x=>[...(Array.isArray(x?.attachments)?x.attachments:[]),...(Array.isArray(x?.files)?x.files:[]),...(Array.isArray(x?.files_v2)?x.files_v2:[])].map(f=>clip(f?.file_name||f?.name||'fichier')).filter(Boolean);
-      const messages=raw.slice().sort((a,b)=>(a.index??0)-(b.index??0)).map(x=>({role:x.sender==='human'?'user':x.sender==='assistant'?'assistant':null,text:text(x),attachments:[...new Set(names(x))]})).filter(x=>x.role&&(x.text||x.attachments.length));
+      const messages=raw.slice().sort((a,b)=>(a.index??0)-(b.index??0)).map(x=>({id:typeof x.uuid==='string'?x.uuid:undefined,role:x.sender==='human'?'user':x.sender==='assistant'?'assistant':null,text:text(x),attachments:[...new Set(names(x))]})).filter(x=>x.role&&(x.text||x.attachments.length));
       if(!messages.length)return fromDom();
       return {status:'ok',source:'api',title:clip(c.name)||clip(document.title),messages};
     }catch(e){return fromDom();}
@@ -177,6 +179,7 @@
       const token=typeof s?.accessToken==='string'?s.accessToken:null;
       if(!token)return fromDom();
       const r=await fetch('https://chatgpt.com/backend-api/conversation/'+m[1],{credentials:'include',cache:'no-store',signal:ctrl.signal,headers:{Accept:'application/json',Authorization:'Bearer '+token}});
+      if(r.status===404)return {status:'not-found'};
       if(!r.ok)return fromDom();
       const c=await r.json(),map=c?.mapping||{};
       const chain=[];let id=c?.current_node,guard=0;
@@ -184,8 +187,8 @@
       const messages=chain.reverse().map(n=>n.message).filter(Boolean).map(x=>{
         const role=x.author?.role,all=Array.isArray(x.content?.parts)?x.content.parts:[],parts=all.filter(p=>typeof p==='string');
         const att=[...(Array.isArray(x.metadata?.attachments)?x.metadata.attachments.map(a=>clip(a?.name||'fichier')):[]),...all.filter(p=>p&&typeof p==='object'&&/image/.test(p.content_type||'')).map(()=>'image')];
-        return {role,text:clip(parts.join('\n\n')),attachments:att,hidden:x.metadata?.is_visually_hidden_from_conversation};
-      }).filter(x=>(x.role==='user'||x.role==='assistant')&&(x.text||x.attachments.length)&&!x.hidden).map(({role,text,attachments})=>({role,text,attachments}));
+        return {id:typeof x.id==='string'?x.id:undefined,role,text:clip(parts.join('\n\n')),attachments:att,hidden:x.metadata?.is_visually_hidden_from_conversation};
+      }).filter(x=>(x.role==='user'||x.role==='assistant')&&(x.text||x.attachments.length)&&!x.hidden).map(({id,role,text,attachments})=>({id,role,text,attachments}));
       if(!messages.length)return fromDom();
       return {status:'ok',source:'api',title:clip(c.title)||clip(document.title),messages};
     }catch(e){return fromDom();}

@@ -55,10 +55,10 @@
 
   /* ---------- Relance programmée ---------- */
   const DEFAULT_TEXT='Continue exactement là où tu t’es arrêté.';
-  let checkpoints=[],awakeInfo={},resumeData={jobs:{},last:null},formOpen=false,form={time:'',text:DEFAULT_TEXT,keepAwake:true,error:''},dismissed={},autoOpenedFor=null,armedInfo=null;
+  let checkpoints=[],flows=[],awakeInfo={},resumeData={jobs:{},last:null},formOpen=false,form={time:'',text:DEFAULT_TEXT,keepAwake:true,error:''},dismissed={},autoOpenedFor=null,armedInfo=null;
   async function loadAux(){
     try{
-      const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.dismiss,K.toast,K.awake,K.drafts]);awakeInfo=v[K.awake]||{};checkpoints=Array.isArray(v[K.drafts])?v[K.drafts]:[];
+      const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.dismiss,K.toast,K.awake,K.drafts,K.flows]);awakeInfo=v[K.awake]||{};checkpoints=Array.isArray(v[K.drafts])?v[K.drafts]:[];flows=Array.isArray(v[K.flows]?.flows)?v[K.flows].flows:[];
       resumeData={jobs:v[K.resume]||{},last:v[K.resumeLast]||null};dismissed=v[K.dismiss]||{};
       const list=(Array.isArray(v[K.toast])?v[K.toast]:[]).filter(t=>t.ts>=loadedAt-60000&&!seenToasts.has(t.id)&&(sitePlatforms.includes(t.platform)||t.type!=='approaching'));
       if(list.length&&!document.hidden){toast=list.at(-1);for(const t of list)seenToasts.add(t.id);}
@@ -199,7 +199,7 @@
     wrapper.innerHTML=`${t}
       <div class="panel ${open?'':'hidden'}" role="region" aria-label="AI Flow"><div class="heading"><b>${logo(site)}AI Flow · ${esc(name(site))}</b><button id="close" class="x" aria-label="Fermer">✕</button></div>
       ${limitCard()}${checkpointSuggestion()}${switchBlock()}${blocks}${resumeSection()}
-      <div class="actions"><button class="link" data-page="dashboard">Tableau de bord</button>${PL.transferable(location.href)?'<button class="link" id="transfer">Transférer</button><button class="link" id="checkpoint">Point de reprise</button>':''}<button class="link" data-page="options">Paramètres</button></div></div>
+      <div class="actions"><button class="link" data-page="dashboard">Tableau de bord</button>${PL.transferable(location.href)?`${flowHere()?'<button class="link" id="sync">Synchroniser</button>':''}<button class="link" id="transfer">Transférer</button><button class="link" id="checkpoint">Point de reprise</button>`:''}<button class="link" data-page="options">Paramètres</button></div></div>
       <button class="pill" id="toggle" aria-expanded="${open}" aria-label="Afficher AI Flow"><span class="dot ${pl.level}"></span><span>AI Flow</span><span class="summary">${esc(pl.label)}</span><span class="chev">${open?'⌄':'⌃'}</span><span class="grip" title="Déplacer">⠿</span></button>`;
     bind();clampPosition();
   }
@@ -217,6 +217,8 @@
     const query={from:site,to:dest};if(why)query.why=why;if(err)query.err=err;
     send('openPage',{page:'transfer',query}).catch(()=>{});
   }
+  // Smart Context Sync : seules les adresses des conversations liées sont lues ici (aucun contenu).
+  function flowHere(){const u=PL.transferable(location.href)?.url;return u?flows.find(f=>Array.isArray(f?.ends)&&f.ends.some(e=>e?.url===u))||null:null;}
   const $=id=>root.getElementById(id);
   function bind(){
     $('toggle').addEventListener('click',e=>{if(dragging){e.preventDefault();dragging=false;return;}open=!open;toast=null;render();});
@@ -224,6 +226,7 @@
     $('close')?.addEventListener('click',()=>{open=false;render();});
     $('transfer')?.addEventListener('click',()=>handoff());
     $('checkpoint')?.addEventListener('click',checkpointNow);
+    $('sync')?.addEventListener('click',()=>{const f=flowHere();if(f)send('openPage',{page:'transfer',query:{sync:f.id,from:PL.transferable(location.href).url,auto:'1'}}).catch(()=>{});});
     $('cp-save')?.addEventListener('click',checkpointNow);
     $('cp-later')?.addEventListener('click',async e=>{
       const k=e.currentTarget.closest('[data-cp-key]').dataset.cpKey;dismissed[k]=Date.now();

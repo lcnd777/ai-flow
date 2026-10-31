@@ -26,6 +26,7 @@ const check=(name,ok,detail='')=>{results.push(`${ok?'✓':'✗'} ${name}${!ok&&
   };
   const launch=()=>chromium.launchPersistentContext(profile,{headless:false,args:[`--disable-extensions-except=${install}`,`--load-extension=${install}`,'--no-first-run']});
   const ext=async ctx=>{let [sw]=ctx.serviceWorkers();if(!sw)sw=await ctx.waitForEvent('serviceworker');return {sw,id:new URL(sw.url()).host};};
+  const VER=JSON.parse(fs.readFileSync(path.join(__dirname,'..','..','safari','manifest.json'),'utf8')).version;
   const installedBuild=()=>Number(JSON.parse(fs.readFileSync(path.join(install,'manifest.json'),'utf8')).version.split('.')[3]);
 
   // 1. Installation initiale (build 1) et données de l'utilisateur.
@@ -33,7 +34,7 @@ const check=(name,ok,detail='')=>{results.push(`${ok?'✓':'✗'} ${name}${!ok&&
   let ctx=await launch(),{sw,id}=await ext(ctx);
   const firstId=id;
   let opt=await ctx.newPage();await opt.goto(`chrome-extension://${id}/options.html`);await opt.waitForTimeout(800);
-  check('Installation initiale : version 1 affichée',/0\.10\.0 dev 1/.test(await opt.locator('#dev-version').innerText()));
+  check('Installation initiale : version 1 affichée',new RegExp(VER.replace(/\./g,'\\.')+' dev 1').test(await opt.locator('#dev-version').innerText()));
   await opt.locator('#threshold').selectOption('70');await opt.waitForTimeout(300);
   await opt.locator('input[name="awakeMode"][value="wake"]').check();await opt.waitForTimeout(300);
   await sw.evaluate(()=>chrome.storage.local.set({
@@ -77,7 +78,7 @@ const check=(name,ok,detail='')=>{results.push(`${ok?'✓':'✗'} ${name}${!ok&&
   ctx=await launch();({sw,id}=await ext(ctx));
   check('Identifiant de l’extension inchangé',id===firstId,`${firstId} → ${id}`);
   opt=await ctx.newPage();await opt.goto(`chrome-extension://${id}/options.html`);await opt.waitForTimeout(800);
-  check('Version 2 active après mise à jour',/0\.10\.0 dev 2/.test(await opt.locator('#dev-version').innerText()));
+  check('Version 2 active après mise à jour',new RegExp(VER.replace(/\./g,'\\.')+' dev 2').test(await opt.locator('#dev-version').innerText()));
   const after=await sw.evaluate(()=>chrome.storage.local.get(null));
   check('Réglages conservés (seuil 70 %, réveil programmé)',after.ai_flow_state_v1?.settings?.alertThreshold===70&&after.ai_flow_state_v1?.settings?.awakeMode==='wake');
   check('Point de reprise conservé',after.ai_flow_drafts_v1?.[0]?.title==='Refonte page tarifs');

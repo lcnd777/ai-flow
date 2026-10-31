@@ -103,6 +103,15 @@
     for(const b of rootEl.querySelectorAll('[data-open-page]'))if(!b.dataset.bound){b.dataset.bound=1;b.addEventListener('click',e=>{e.preventDefault();openPage(b.dataset.openPage,b.dataset.query?JSON.parse(b.dataset.query):undefined);});}
     for(const b of rootEl.querySelectorAll('[data-open-platform]'))if(!b.dataset.bound){b.dataset.bound=1;b.addEventListener('click',e=>{e.preventDefault();openPlatform(b.dataset.openPlatform);});}
   }
+  // Smart Context Sync : Flows (conversations liées), lus via l'arrière-plan (décisions déchiffrées en mémoire seulement).
+  async function loadFlows(){try{return await A.request('flows',null,{timeout:6000});}catch{return {flows:[],quarantined:0,encryption:false};}}
+  const SYNC_LABEL={prepared:'préparée, à confirmer','pending-insert':'en cours d’insertion',inserted:'insérée, à confirmer',failed:'échouée, à reprendre'};
+  function flowState(f){
+    const open=(f.ledger||[]).find(x=>SYNC_LABEL[x.state]);
+    if(open)return {text:'Synchronisation '+SYNC_LABEL[open.state],pending:true};
+    return {text:f.lastSync?'Synchronisé '+A.dayClock(f.lastSync.at):'Jamais synchronisé',pending:false};
+  }
+  function flowOf(flows,url){const u=A.api&&window.AIFlowPlatforms.conversationOf(url||'')?.url;return u?(flows||[]).find(f=>f.ends.some(e=>e.url===u))||null:null;}
   async function getDrafts(){return (await loadExtras()).drafts;}
   async function saveDrafts(list){await A.api.storage.local.set({[A.KEYS.drafts]:list.slice(0,20)});}
   // Safari ne transmet pas toujours storage.onChanged : relecture périodique en plus.
@@ -112,5 +121,5 @@
     setInterval(refresh,ms);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   }
-  root.AIFlowUI={FAILURES,logo,meter,connection,platformCard,smartSwitchHTML,awakeText,isMac,loadExtras,openPage,openPlatform,openUrl,bindNav,getDrafts,saveDrafts,live,chip};
+  root.AIFlowUI={FAILURES,logo,meter,connection,platformCard,smartSwitchHTML,awakeText,isMac,loadExtras,openPage,openPlatform,openUrl,bindNav,getDrafts,saveDrafts,loadFlows,flowState,flowOf,live,chip};
 })(window);

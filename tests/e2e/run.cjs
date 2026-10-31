@@ -14,6 +14,7 @@ function check(name,cond,detail=''){results.push(`${cond?'✓':'✗'} ${name}${!
 
 let claude={five_hour:{utilization:30,resets_at:iso(2*H)},seven_day:{utilization:20,resets_at:iso(70*H)}};
 let codexUsed=12;
+const gptConvs={};
 const page=(title,body='')=>`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:sans-serif;background:#f6f6f2;min-height:100vh;margin:0;padding:30px"><h1>${title} (simulé)</h1>${body}</body></html>`;
 const composer=`<div class="ProseMirror" contenteditable="true" style="border:1px solid #999;min-height:40px;padding:6px"></div><button aria-label="Send message" onclick="window.__sent=(document.querySelector('.ProseMirror').textContent);document.querySelector('.ProseMirror').textContent='';document.title='SENT:'+window.__sent">Send</button><p>Une conversation fictive, sans contenu réel.</p>`;
 
@@ -30,6 +31,11 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   await ctx.route('https://chatgpt.com/**',r=>{
     const u=new URL(r.request().url());
     if(u.pathname==='/api/auth/session')return r.fulfill({json:{accessToken:'fake-token-never-stored'}});
+    const cm=u.pathname.match(/^\/backend-api\/conversation\/([\w-]+)$/);
+    if(cm&&gptConvs[cm[1]]){
+      const list=gptConvs[cm[1]],mapping={};list.forEach((m,i)=>{mapping['n'+i]={id:'n'+i,parent:i?'n'+(i-1):null,message:{id:'m-'+cm[1]+'-'+i,author:{role:m.role},content:{parts:[m.text]},metadata:{}}};});
+      return r.fulfill({json:{title:'Tarifs (suite)',current_node:'n'+(list.length-1),mapping}});
+    }
     if(u.pathname==='/backend-api/wham/usage')return r.fulfill({json:{rate_limit:{primary_window:{limit_window_seconds:18000,used_percent:codexUsed,reset_at:Math.floor(Date.now()/1000)+3*3600},secondary_window:{limit_window_seconds:604800,used_percent:41}}}});
     return r.fulfill({contentType:'text/html',body:page('ChatGPT',composer)});
   });
@@ -261,6 +267,82 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     check('Transfert : conversation récupérée depuis la page, modes activés',/3 messages/.test(await t2.locator('#source-info').innerText())&&!(await t2.locator('input[name="mode"][value="full"]').isDisabled()));
     await t2.setViewportSize({width:1200,height:900});await t2.screenshot({path:path.join(shots,'transfer-pick.png'),fullPage:true});
     await t2.close();
+  }
+  // 7 ter. Smart Context Sync : liaison acceptée → avancées ChatGPT → prévisualisation → insertion dans Claude → confirmation → « À jour ».
+  {
+    const pend=await storage('ai_flow_dest_pending_v1')||{};
+    const linkEntry=Object.values(pend).find(p=>p.link);
+    check('Sync : liaison proposée lors du transfert, enregistrée seulement si cochée',!linkEntry,'aucune liaison sans case cochée');
+    const t3=await ctx.newPage();await t3.goto(E('transfer.html'));await t3.waitForTimeout(800);
+    const pickBtn=t3.locator('#pick-list [data-tab]').first();if(await pickBtn.count()){await pickBtn.click();await t3.waitForTimeout(2500);}
+    check('Sync : case « Lier ces conversations » proposée après récupération',await t3.locator('#link-row').isVisible()&&!(await t3.locator('#link-flow').isChecked()));
+    await t3.locator('#link-flow').check();
+    const before=new Set(ctx.pages());
+    await t3.locator('#go').click();await t3.waitForTimeout(3000);
+    for(const p of ctx.pages())if(!before.has(p)&&p!==t3)await p.close().catch(()=>{});
+    const pend2=await storage('ai_flow_dest_pending_v1')||{};
+    const [oldTab,entry]=Object.entries(pend2).find(([,p])=>p.link)||[];
+    check('Sync : liaison en attente de la conversation de destination (empreintes seulement)',!!entry&&entry.link.seen.hashes.length===3&&!JSON.stringify(entry).includes('page tarifs en trois'));
+    // L'onglet créé par l'extension échappe aux sites simulés : on rattache l'attente à l'onglet ChatGPT simulé, qui « devient » la nouvelle conversation.
+    gptConvs['linked-conv']=[{role:'user',text:'Je reprends avec toi un travail commencé sur Claude. Voici le contexte utile…'},{role:'user',text:'Finalement on abandonne le paiement annuel, on reste en mensuel.'},{role:'assistant',text:'D’accord. J’ai terminé la FAQ en mensuel. Prochaines étapes :\n- tester le paiement sur Safari'}];
+    const pgId=await sw.evaluate(async()=>(await chrome.tabs.query({})).find(t=>(t.url||'').startsWith('https://chatgpt.com/c/xyz'))?.id);
+    await sw.evaluate(async([from,to])=>{const k='ai_flow_dest_pending_v1';const v=(await chrome.storage.local.get(k))[k];v[to]=v[from];delete v[from];await chrome.storage.local.set({[k]:v});},[oldTab,pgId]);
+    await pg.goto('https://chatgpt.com/c/linked-conv');await pg.waitForTimeout(2000);
+    const flows=await storage('ai_flow_flows_v1');
+    const fl=flows?.flows?.[0];
+    check('Sync : Flow créé après création de la conversation de destination',flows?.flows?.length===1&&fl.ends[0].url.includes('claude.ai/chat/')&&fl.ends[1].url==='https://chatgpt.com/c/linked-conv');
+    check('Sync : décisions du Flow chiffrées au repos (aucun texte en clair)',!!fl?.sealed?.ct&&!JSON.stringify(flows).includes('paiement annuel'));
+    await t3.close();
+    // Pastille de la conversation liée : « Synchroniser ».
+    let wg=await widget(pg);if(/class="panel hidden/.test(wg.html)){await wg.click('#toggle');wg=await widget(pg);}
+    check('Sync : bouton « Synchroniser » dans la pastille de la conversation liée',/id="sync"/.test(wg.html));
+    await wg.click('#sync');await pg.waitForTimeout(3500);
+    const sv=ctx.pages().find(p=>p.url().includes('transfer.html')&&p.url().includes('sync='));
+    check('Sync : vue de synchronisation ouverte, avancées récupérées sur le clic',!!sv);
+    if(sv){
+      await sv.bringToFront();await sv.waitForTimeout(800);
+      const sum=await sv.locator('#sync-summary').innerText();
+      check('Sync : 2 nouveaux messages, transfert initial ignoré',/2 nouveaux messages/.test(sum),sum);
+      const itemsTxt=await sv.locator('#sync-items').innerText();
+      check('Sync : décision nouvelle marquée « Remplace » la proposition d’origine',/Remplace/.test(itemsTxt)&&/abandonne le paiement annuel/.test(await sv.locator('#sync-items').innerHTML()),itemsTxt.slice(0,300));
+      const pk=await sv.locator('#sync-packet').inputValue();
+      check('Sync : message de mise à jour structuré (décisions, terminé, prochaines étapes)',/\[AI Flow · Mise à jour de contexte\]/.test(pk)&&/Décisions modifiées ou remplacées/.test(pk)&&/Travail terminé/.test(pk)&&/tester le paiement/.test(pk),pk.slice(0,400));
+      // Exclure un élément : il disparaît du message.
+      const doneRow=sv.locator('.sync-item',{hasText:'FAQ'}).first();
+      await doneRow.locator('input[type=checkbox]').uncheck();await sv.waitForTimeout(200);
+      check('Sync : élément exclu retiré du message',!/terminé la FAQ/.test(await sv.locator('#sync-packet').inputValue()));
+      await doneRow.locator('input[type=checkbox]').check();
+      await sv.setViewportSize({width:1200,height:900});await sv.screenshot({path:path.join(shots,'sync-preview.png'),fullPage:true});
+      await pc.evaluate(()=>{document.querySelector('.ProseMirror').textContent='';});
+      await sv.locator('#sync-insert').click();
+      for(let i=0;i<40;i++){await sv.waitForTimeout(300);if(/Inséré|échouée|impossible/.test(await sv.locator('#sync-state').innerText()))break;}
+      await sv.waitForTimeout(800);let ins='',insPage=null;
+      for(const p of ctx.pages())if(p.url().startsWith('https://claude.ai/chat/')){const t=await p.evaluate(()=>document.querySelector('.ProseMirror')?.textContent||'').catch(()=>'');if(/Mise à jour de contexte/.test(t)){ins=t;insPage=p;}}
+      check('Sync : la conversation Claude liée est réutilisée (onglet existant, pas de doublon)',ctx.pages().filter(p=>p.url().startsWith('https://claude.ai/chat/')).length===1,ctx.pages().map(p=>p.url()).join(' | '));
+      check('Sync : mise à jour insérée dans la conversation Claude liée, restée dans la zone de saisie (non envoyée)',/Mise à jour de contexte/.test(ins)&&!!insPage,JSON.stringify(await Promise.all(ctx.pages().filter(p=>p.url().includes('claude.ai')).map(p=>p.evaluate(()=>location.href+' :: '+(document.querySelector('.ProseMirror')?.textContent||'').slice(0,80))))));
+      let led=(await storage('ai_flow_flows_v1')).flows[0].ledger[0];
+      check('Sync : état « Insérée, à confirmer » (pas encore synchronisé)',led.state==='inserted');
+      await sv.bringToFront();await sv.locator('#sync-confirm').click();await sv.waitForTimeout(800);
+      led=(await storage('ai_flow_flows_v1')).flows[0];
+      check('Sync : confirmation enregistrée, point de référence avancé',led.ledger[0].state==='confirmed'&&led.rev===1&&/confirmée/.test(await sv.locator('#sync-summary').innerText()));
+      await sv.locator('#sync-run').click();await sv.waitForTimeout(2500);
+      check('Sync : nouvelle vérification → « À jour »',/À jour/.test(await sv.locator('#sync-summary').innerText()),await sv.locator('#sync-summary').innerText());
+      // Conflit : la conversation revient sur une décision validée → choix obligatoire, jamais résolu en silence.
+      gptConvs['linked-conv'].push({role:'user',text:'Finalement on garde le paiement annuel pour les équipes.'});
+      await sv.locator('#sync-run').click();await sv.waitForTimeout(2500);
+      check('Sync : conflit affiché avec les 4 choix',await sv.locator('div.conflict').count()===1&&/Conserver la première[\s\S]*Conserver la seconde[\s\S]*Fusionner manuellement[\s\S]*Reporter le choix/.test(await sv.locator('div.conflict').innerText()));
+      check('Sync : transmission bloquée tant que le conflit n’est pas résolu',await sv.locator('#sync-insert').isDisabled()&&/conflit/.test(await sv.locator('#sync-block').innerText()));
+      await sv.locator('div.conflict input[value="defer"]').check();await sv.waitForTimeout(200);
+      check('Sync : « Reporter le choix » → décision transmise comme « À arbitrer »',!(await sv.locator('#sync-insert').isDisabled())&&/À arbitrer/.test(await sv.locator('#sync-packet').inputValue()));
+      await sv.setViewportSize({width:1200,height:900});await sv.screenshot({path:path.join(shots,'sync-conflict.png'),fullPage:true});
+      const cp=(await storage('ai_flow_drafts_v1')).find(d=>d.id===fl.checkpointId);
+      check('Sync : point de reprise mis à jour à la confirmation',!!cp?.syncedAt&&/abandonne le paiement annuel/.test(cp.fields.decisions||''));
+      await sv.close();
+    }
+    const dash2=await ctx.newPage();await dash2.goto(E('dashboard.html'));await dash2.waitForTimeout(1500);
+    const flowsTxt=await dash2.locator('#flows').innerText();
+    check('Tableau de bord : conversation liée, dernière synchronisation, décisions validées',/Synchronisé/.test(flowsTxt)&&/décision/.test(flowsTxt)&&/Dissocier/.test(flowsTxt),flowsTxt.slice(0,300));
+    await dash2.close();
   }
   const pop2=await ctx.newPage();await pop2.setViewportSize({width:380,height:600});await pop2.goto(E('popup.html'));await pop2.waitForTimeout(1200);
   check('Popup : points de reprise et travail interrompu accessibles',/point(s)? de reprise/i.test(await pop2.locator('body').innerText()));

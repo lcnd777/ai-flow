@@ -9,10 +9,13 @@
   - travaux interrompus par une limite : titre et lien de la conversation, sans son contenu ;
   - relances programmées (URL de la conversation et message choisi) ;
   - un identifiant d'organisation Claude et une empreinte courte du compte Codex, pour ne jamais mélanger deux comptes.
+  - Smart Context Sync (conversations que tu as liées) : adresses et titres des deux conversations, **empreintes** des messages déjà synchronisés (jamais leur texte), journal des synchronisations, et décisions suivies — ces décisions et le brouillon en attente sont **chiffrés** (AES-GCM, clé non extractible conservée dans IndexedDB sur cet appareil). Détails : [SMART-CONTEXT-SYNC.md](SMART-CONTEXT-SYNC.md).
 - **Jamais stocké** : mot de passe, cookie, jeton de session.
-- **Contenu des conversations** : lu uniquement sur ton clic (« Transférer cette conversation », « Point de reprise »), pour l’onglet affiché seulement. Il reste en mémoire de la page de transfert et n’est conservé que si tu enregistres un point de reprise. AI Flow ne parcourt jamais tes autres conversations.
+- **Contenu des conversations** : lu uniquement sur ton clic (« Transférer cette conversation », « Point de reprise », « Synchroniser »), pour l’onglet affiché seulement. Il reste en mémoire de la page de transfert et n’est conservé que si tu enregistres un point de reprise. AI Flow ne parcourt jamais tes autres conversations.
 - **Jamais transmis** à un serveur AI Flow : il n'y en a pas. Les seules requêtes réseau sont les lectures de quota, faites par ton propre onglet vers la plateforme elle-même.
 - **Transfert** : le message est copié dans ton presse-papiers et, si tu le choisis, inséré dans la zone de saisie de l’autre IA, **sans jamais être envoyé** à ta place.
 - **App Mac** : elle reçoit l’heure de fin du maintien éveillé, et le texte des notifications. Aucun contenu de conversation. Le lien local `aiflow://` ou `aiflow-dev://` ne sort pas du Mac.
 - **Pièces jointes** : seuls leurs noms sont lus (pour te signaler qu’elles ne sont pas transférées) ; leur contenu n’est jamais récupéré.
-- **Effacement** : Paramètres › Données (relevés, historique). Les reprises se suppriment depuis le tableau de bord. Désinstaller l'extension efface tout.
+- **Secrets** : les clés API, jetons, clés privées et mots de passe évidents sont détectés localement et masqués par défaut avant un transfert ou une synchronisation.
+- **Chiffrement** : le stockage local du navigateur n’est pas chiffré par lui-même ; seuls les contenus de Smart Context Sync cités ci-dessus le sont, par AI Flow.
+- **Effacement** : Paramètres › Données (relevés, historique). Les reprises et les conversations liées (« Dissocier », « Supprimer ») se suppriment depuis le tableau de bord. Désinstaller l'extension efface tout.

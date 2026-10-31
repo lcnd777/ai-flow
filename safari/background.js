@@ -1,7 +1,7 @@
 /* AI Flow — arrière-plan : seul écrivain de l'état. Lit les quotas uniquement depuis les onglets officiels
  * déjà ouverts (jamais d'ouverture ni de rechargement automatique de conversation). */
-if(typeof importScripts==='function')importScripts('platforms.js','shared.js','readers.js');
-const PL=globalThis.AIFlowPlatforms,A=globalThis.AIFlow,R=globalThis.AIFlowReaders,api=A.api,K=A.KEYS;
+if(typeof importScripts==='function')importScripts('platforms.js','shared.js','readers.js','sync.js','vault.js');
+const PL=globalThis.AIFlowPlatforms,A=globalThis.AIFlow,R=globalThis.AIFlowReaders,S=globalThis.AIFlowSync,V=globalThis.AIFlowVault,api=A.api,K=A.KEYS;
 const ALARM='ai-flow-refresh',ALARM_MINUTES=2,AUTO_MIN_GAP=60000,ACCOUNT_KEY='ai_flow_accounts_v1';
 const PAGES={dashboard:'dashboard.html',options:'options.html',transfer:'transfer.html'};
 const EXT_PAGES=['popup.html','dashboard.html','options.html','transfer.html'];
@@ -214,25 +214,32 @@ async function recordInterruptions(events,notices){
 
 /* ---------- Smart Transfer 2.0 : capture sur clic, ouverture et insertion sans envoi ---------- */
 async function captureConversation(tabId){
+  const capture=await captureTab(tabId);
+  await save(K.capture,capture);
+  return {count:capture.messages.length,chars:capture.chars,title:capture.title,source:capture.source,platform:capture.platform,attachments:capture.attachments};
+}
+// Capture Engine : messages normalisés (rôle, texte, pièces jointes, identifiant si la plateforme le fournit).
+async function captureTab(tabId){
   let tab;try{tab=await api.tabs.get(tabId);}catch{throw Error('Onglet introuvable.');}
   const site=PL.siteFor(tab.url||'');
   if(site!=='claude'&&site!=='chatgpt')throw Error('Ouvre une conversation Claude ou ChatGPT, puis réessaie.');
   let r;
   try{const f=await api.scripting.executeScript({target:{tabId},world:'MAIN',func:site==='claude'?R.claudeConversation:R.chatgptConversation});r=f?.[0]?.result;}
-  catch{throw Error('Safari n’autorise pas encore AI Flow à lire cet onglet. Autorise le site dans les réglages des extensions.');}
+  catch{throw Object.assign(Error('Safari n’autorise pas encore AI Flow à lire cet onglet. Autorise le site dans les réglages des extensions.'),{code:'permission'});}
+  if(r?.status==='not-found')throw Object.assign(Error('Conversation introuvable : elle a peut-être été supprimée, ou appartient à un autre compte.'),{code:'not-found'});
   const messages=[];let total=0;
   for(const m of Array.isArray(r?.messages)?r.messages.slice(-800):[]){
     if((m?.role!=='user'&&m?.role!=='assistant')||typeof m.text!=='string')continue;
     const text=m.text.slice(0,60000);
     const attachments=(Array.isArray(m.attachments)?m.attachments:[]).filter(x=>typeof x==='string').slice(0,20).map(x=>x.slice(0,100));
     if(!text.trim()&&!attachments.length)continue;
-    total+=text.length;if(total>600000)break;messages.push({role:m.role,text,attachments});
+    total+=text.length;if(total>600000)break;
+    const id=typeof m.id==='string'&&/^[\w-]{1,80}$/.test(m.id)?m.id:undefined;
+    messages.push(id?{id,role:m.role,text,attachments}:{role:m.role,text,attachments});
   }
-  if(!messages.length)throw Error('Aucun message lisible dans cet onglet. Sélectionne le texte utile et utilise « Transférer » dans la pastille, ou remplis les champs à la main.');
+  if(!messages.length)throw Object.assign(Error('Aucun message lisible dans cet onglet. Sélectionne le texte utile et utilise « Transférer » dans la pastille, ou remplis les champs à la main.'),{code:'empty'});
   const conv=PL.conversationOf(tab.url||'');
-  const capture={ts:Date.now(),platform:site,url:conv?.url||null,title:cleanTitle(r.title||tab.title),source:r.source==='api'?'api':'page',messages,attachments:messages.reduce((n,m)=>n+m.attachments.length,0)};
-  await save(K.capture,capture);
-  return {count:messages.length,chars:total,title:capture.title,source:capture.source,platform:site,attachments:capture.attachments};
+  return {ts:Date.now(),platform:site,url:conv?.url||null,title:cleanTitle(r.title||tab.title),source:r.source==='api'?'api':'page',messages,chars:total,attachments:messages.reduce((n,m)=>n+m.attachments.length,0)};
 }
 const NEW_CHAT={claude:'https://claude.ai/new',chatgpt:'https://chatgpt.com/'};
 const NOTIFY_LINKS='ai_flow_notify_links_v1',DEST_PENDING='ai_flow_dest_pending_v1';
@@ -245,6 +252,7 @@ async function linkDestination(tabId,url){
   const list=A.cleanCheckpoints(await load(K.drafts,[])),cp=list.find(d=>d.id===p.checkpointId);
   if(cp){cp.destUrl=conv.url;cp.target=conv.platform;cp.updatedAt=Date.now();await save(K.drafts,A.cleanCheckpoints(list));}
   delete pending[tabId];await save(DEST_PENDING,pending);
+  if(p.link)try{await createFlow({decisions:p.link.decisions,checkpointId:p.checkpointId,title:p.link.title||cp?.title,a:{url:p.link.sourceUrl,title:p.link.sourceTitle||p.link.title,baseline:{...p.link.seen,at:Date.now()}},b:{url:conv.url,title:p.link.title,baseline:S.emptyBaseline()}});}catch{}
   return !!cp;
 }
 api.tabs.onUpdated?.addListener((tabId,change)=>{if(change.url)serial(()=>linkDestination(tabId,change.url)).catch(()=>{});});
@@ -253,15 +261,184 @@ async function waitLoaded(tabId,ms=20000){
   while(Date.now()<end){try{const t=await api.tabs.get(tabId);if(t.status==='complete'&&/^https:/.test(t.url||''))return true;}catch{return false;}await new Promise(r=>setTimeout(r,400));}
   return false;
 }
-async function openAndInsert(platform,text,insert,checkpointId){
+async function openAndInsert(platform,text,insert,checkpointId,link){
   if(!NEW_CHAT[platform])throw Error('Destination inconnue');
   if(typeof text!=='string'||!text.trim()||text.length>200000)throw Error('Texte vide ou trop long.');
   const tab=await api.tabs.create({url:NEW_CHAT[platform],active:true,pinned:false});
-  if(typeof checkpointId==='string'&&checkpointId){const p=await load(DEST_PENDING,{});p[tab.id]={checkpointId:checkpointId.slice(0,40),at:Date.now()};await save(DEST_PENDING,p);}
+  if(typeof checkpointId==='string'&&checkpointId){
+    const p=await load(DEST_PENDING,{});
+    // Liaison demandée explicitement (case cochée) : le Flow sera créé quand la conversation de destination existera.
+    const src=link&&PL.conversationOf(link.sourceUrl||'');
+    p[tab.id]={checkpointId:checkpointId.slice(0,40),at:Date.now(),link:src&&src.platform!==platform?{sourceUrl:src.url,title:String(link.title||'').slice(0,120),sourceTitle:String(link.sourceTitle||'').slice(0,120),seen:S.cleanBaseline(link.seen),decisions:S.cleanDecisions(link.decisions).slice(-40).map(({subject,...d})=>d)}:null};
+    await save(DEST_PENDING,p);
+  }
   if(!insert)return {status:'opened'};
   if(!await waitLoaded(tab.id))return {status:'not-loaded'};
   try{const f=await api.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:R.insertDraft,args:[text]});return f?.[0]?.result||{status:'not-inserted'};}
   catch(e){return {status:'injection-failed',error:String(e?.message||e).slice(0,160)};}
+}
+/* ---------- Smart Context Sync : dépôt local (storage.local), journal, chiffrement des contenus sensibles ----------
+   Rien n'est lu sans clic ; rien n'est envoyé sans clic ; le point de référence n'avance qu'après confirmation. */
+async function loadFlows(){
+  const r=S.cleanFlows(await load(K.flows,null));
+  if(r.dropped.length){
+    // Données illisibles : mises de côté (jamais effacées en silence) et signalées dans le tableau de bord.
+    const q=await load(K.flowsQuarantine,[]);
+    await save(K.flowsQuarantine,[...(Array.isArray(q)?q:[]),...r.dropped.map(data=>({at:Date.now(),data}))].slice(-20));
+    await save(K.flows,{v:S.SCHEMA,flows:r.flows});
+  }
+  return r.flows;
+}
+const saveFlows=flows=>save(K.flows,{v:S.SCHEMA,flows:flows.slice(0,30)});
+async function openSecret(flow){
+  if(flow.plain)return {decisions:flow.plain.decisions,pending:flow.plain.pending,encrypted:false};
+  if(!flow.sealed)return {decisions:[],pending:{},encrypted:true};
+  try{const o=await V.open(flow.sealed);return {decisions:S.cleanDecisions(o?.decisions),pending:S.cleanPending(o?.pending),encrypted:true};}
+  catch{return {decisions:[],pending:{},encrypted:true,locked:true};}
+}
+const strip=list=>list.map(({subject,...d})=>d);
+async function closeSecret(flow,secret){
+  const data={decisions:strip(S.cleanDecisions(secret.decisions)),pending:Object.fromEntries(Object.entries(S.cleanPending(secret.pending)).map(([u,v])=>[u,{...v,decisions:strip(v.decisions)}]))};
+  if(await V.available()){flow.sealed=await V.seal(data);flow.plain=null;}else{flow.plain=data;flow.sealed=null;}
+  flow.locked=false;
+}
+async function sealDraft(draft){return await V.available()?{sealed:await V.seal(draft)}:{plain:draft};}
+async function openDraft(d){if(!d)return null;if(d.plain)return d.plain;try{return await V.open(d.sealed);}catch{return null;}}
+const accountFor=async platform=>(await load(ACCOUNT_KEY,{}))[platform==='chatgpt'?'codex':'claude']||null;
+async function createFlow({checkpointId,title,a,b,decisions}){
+  const ca=PL.conversationOf(a?.url||''),cb=PL.conversationOf(b?.url||'');
+  if(!ca||!cb||ca.url===cb.url||![ca,cb].every(c=>['claude','chatgpt'].includes(c.platform)))throw Error('Conversations non prises en charge.');
+  const flows=await loadFlows();
+  const same=flows.find(f=>f.ends.some(e=>e.url===ca.url)&&f.ends.some(e=>e.url===cb.url));if(same)return same;
+  if(flows.some(f=>f.ends.some(e=>e.url===ca.url||e.url===cb.url)))throw Error('Une de ces conversations est déjà liée à un autre Flow : dissocie-la d’abord.');
+  const now=Date.now(),end=async(c,x)=>({platform:c.platform,url:c.url,title:String(x.title||'Conversation').slice(0,120),account:await accountFor(c.platform),baseline:x.baseline||S.emptyBaseline(true)});
+  const flow={id:'flow-'+now.toString(36)+'-'+Math.random().toString(36).slice(2,6),title:String(title||a.title||'Travail en cours').slice(0,120),createdAt:now,updatedAt:now,rev:0,
+    checkpointId:typeof checkpointId==='string'?checkpointId:null,ends:[await end(ca,a),await end(cb,b)],lastSync:null,ledger:[],sealed:null,plain:null,locked:false};
+  await closeSecret(flow,{decisions:S.cleanDecisions(decisions),pending:{}});
+  await saveFlows(S.cleanFlows({v:1,flows:[flow,...flows]}).flows);
+  return flow;
+}
+// Liaison a posteriori d'un point de reprise déjà relié à sa destination (versions antérieures) : sur clic uniquement.
+async function linkCheckpoint(checkpointId){
+  const cp=A.cleanCheckpoints(await load(K.drafts,[])).find(d=>d.id===checkpointId);
+  if(!cp?.url||!cp.destUrl)throw Error('Ce point de reprise n’a pas de conversation de destination connue.');
+  return publicFlow(await createFlow({checkpointId,title:cp.title,a:{url:cp.url,title:cp.title,baseline:S.emptyBaseline(true)},b:{url:cp.destUrl,title:cp.title,baseline:S.emptyBaseline(true)}}),{decisions:[],pending:{}});
+}
+function publicFlow(f,secret){
+  return {id:f.id,title:f.title,createdAt:f.createdAt,updatedAt:f.updatedAt,rev:f.rev,checkpointId:f.checkpointId,lastSync:f.lastSync,
+    ends:f.ends.map(e=>({platform:e.platform,url:e.url,title:e.title,syncedAt:e.baseline.at,firstSync:e.baseline.unknown})),
+    ledger:f.ledger.map(({seen,draft,...x})=>({...x,hasDraft:!!draft})),decisions:strip(secret.decisions||[]),
+    pending:Object.fromEntries(Object.entries(secret.pending||{}).map(([u,v])=>[u,{at:v.at,count:v.decisions.length}])),
+    encrypted:!!secret.encrypted,locked:!!secret.locked};
+}
+async function flowsList(){
+  const flows=await loadFlows(),out=[];
+  for(const f of flows)out.push(publicFlow(f,await openSecret(f)));
+  const q=await load(K.flowsQuarantine,[]);
+  return {flows:out,quarantined:Array.isArray(q)?q.length:0,encryption:await V.available()};
+}
+async function findFlow(id){const flows=await loadFlows(),f=flows.find(x=>x.id===id);if(!f)throw Error('Flow introuvable (dissocié ou supprimé).');return {flows,flow:f};}
+// Étape B : capture explicite de la conversation source, comparaison au dernier point de référence confirmé.
+async function syncCapture(flowId,fromUrl){
+  const {flow}=await findFlow(flowId);
+  const from=flow.ends.find(e=>e.url===PL.conversationOf(fromUrl||'')?.url);if(!from)throw Error('Cette conversation n’appartient pas à ce Flow.');
+  const to=S.otherEnd(flow,from.url);
+  const tab=(await allTabs()).find(t=>PL.conversationOf(t.url||'')?.url===from.url);
+  if(!tab)return {needTab:true,from:from.url,to:to.url};
+  let capture;
+  try{capture=await captureTab(tab.id);}
+  catch(e){return {error:{code:e.code||'capture',message:e.message},from:from.url,to:to.url};}
+  const delta=S.computeDelta(capture.messages,from.baseline,{source:capture.source});
+  const changed=[...delta.fresh,...delta.modified].sort((a,b)=>a.index-b.index);
+  const secret=await openSecret(flow);
+  const items=S.extractItems(changed);
+  const theirs=secret.pending[to.url]?.decisions||[];
+  const entries=S.reconcile(items,secret.decisions,theirs);
+  const seen=S.baselineFrom(capture.messages,null);
+  const cur=await accountFor(from.platform);
+  // Décisions encore non synchronisées de cette conversation : base de la comparaison à trois états côté opposé.
+  if(!delta.upToDate)await serial(async()=>{
+    const fresh=(await loadFlows()).find(x=>x.id===flowId);if(!fresh)return;
+    const sec=await openSecret(fresh);
+    const decisions=items.filter(i=>i.kind==='decision').map(i=>({text:i.text,polarity:i.polarity,status:i.status}));
+    if(decisions.length)sec.pending[from.url]={at:Date.now(),decisions};else delete sec.pending[from.url];
+    if(!sec.locked){await closeSecret(fresh,sec);const all=await loadFlows();await saveFlows(all.map(x=>x.id===flowId?fresh:x));}
+  });
+  return {flow:publicFlow(flow,secret),from:from.url,to:to.url,source:capture.source,title:capture.title,
+    delta:{fresh:delta.fresh.length,modified:delta.modified.length,known:delta.known,packets:delta.packets,total:delta.total,partial:delta.partial,anchorMissing:delta.anchorMissing,firstSync:delta.firstSync,upToDate:delta.upToDate,attachments:delta.attachments},
+    items:items.map(({subject,...i})=>i),
+    entries:entries.map(e=>({itemId:e.item.id,relation:e.relation,required:e.required,threeWay:e.threeWay,linked:!!e.linked,target:e.target?{id:e.target.id||null,text:e.target.text,status:e.target.status,pending:!!e.target.pending,polarity:e.target.polarity}:null})),
+    messages:changed.map(m=>({role:m.role,text:m.text.slice(0,20000),modified:!!m.modified})),
+    seen,accountMismatch:!!(from.account&&cur&&cur!==from.account)};
+}
+async function syncPrepare(p){
+  const {flows,flow}=await findFlow(p?.flowId);
+  const from=PL.conversationOf(p.from||'')?.url,to=PL.conversationOf(p.to||'')?.url;
+  if(!flow.ends.some(e=>e.url===from)||!flow.ends.some(e=>e.url===to)||from===to)throw Error('Direction de synchronisation invalide.');
+  const packet=String(p.packet||'');if(!packet.trim()||packet.length>200000)throw Error('Message de mise à jour vide ou trop long.');
+  const now=Date.now();
+  // Une nouvelle préparation remplace la précédente dans le même sens (contexte modifié entre-temps).
+  for(const x of flow.ledger)if(x.from===from&&x.to===to&&!S.TERMINAL.has(x.state)){x.state='cancelled';x.error='Remplacée par une préparation plus récente.';x.updatedAt=now;x.draft=null;x.seen=null;}
+  const ops=(Array.isArray(p.ops)?p.ops:[]).slice(0,80);
+  const entry={id:'sync-'+now.toString(36),from,to,state:'prepared',at:now,updatedAt:now,baseRev:flow.rev,counts:p.counts||{},seen:S.cleanBaseline(p.seen),
+    draft:await sealDraft({packet,ops,choices:p.choices||{},excluded:Array.isArray(p.excluded)?p.excluded.slice(0,200):[]}),error:null};
+  flow.ledger.unshift(entry);flow.updatedAt=now;
+  await saveFlows(S.cleanFlows({v:1,flows:flows.map(x=>x.id===flow.id?flow:x)}).flows);
+  return {entryId:entry.id,state:entry.state};
+}
+async function setEntryState(flowId,entryId,state,error){
+  const {flows,flow}=await findFlow(flowId);
+  const e=flow.ledger.find(x=>x.id===entryId);if(!e)throw Error('Synchronisation introuvable.');
+  if(e.state===state)return {state};
+  if(!S.canTransition(e.state,state))throw Error(`Transition impossible : ${S.LEDGER_LABEL[e.state]} → ${S.LEDGER_LABEL[state]||state}.`);
+  const now=Date.now();
+  if(state==='confirmed'){
+    if(e.baseRev!==flow.rev)throw Error('Le Flow a changé depuis la préparation (une autre synchronisation a été confirmée) : prépare à nouveau pour éviter les doublons.');
+    const draft=await openDraft(e.draft);
+    const from=flow.ends.find(x=>x.url===e.from);
+    from.baseline=S.mergeSeen(from.baseline,e.seen,now);
+    const secret=await openSecret(flow);
+    secret.decisions=S.applyDecisionOps(secret.decisions,draft?.ops||[],{platform:from.platform},now);
+    delete secret.pending[e.from];
+    await closeSecret(flow,secret);
+    flow.rev++;flow.lastSync={at:now,from:e.from,to:e.to};
+    e.draft=null;e.seen=null;
+    // Point de reprise du Flow : mis à jour uniquement après confirmation (jamais à chaque consultation).
+    const list=A.cleanCheckpoints(await load(K.drafts,[])),cp=list.find(d=>d.id===flow.checkpointId);
+    if(cp){
+      const lab={validated:'',conflict:'À arbitrer : ',proposed:'Proposition : '};
+      const dec=secret.decisions.filter(d=>d.status in lab).map(d=>'- '+lab[d.status]+d.text).join('\n');
+      cp.fields={...cp.fields,decisions:dec||cp.fields.decisions||''};cp.syncedAt=now;cp.updatedAt=now;
+      await save(K.drafts,A.cleanCheckpoints(list));
+    }
+  }
+  if(state==='cancelled'){e.draft=null;e.seen=null;}
+  e.state=state;e.updatedAt=now;e.error=state==='failed'||state==='cancelled'?String(error||'').slice(0,160)||null:null;
+  flow.updatedAt=now;
+  await saveFlows(S.cleanFlows({v:1,flows:flows.map(x=>x.id===flow.id?flow:x)}).flows);
+  return {state,rev:flow.rev};
+}
+// Étape D : ouverture de la conversation de destination et insertion SANS envoi.
+async function syncInsert(flowId,entryId,text){
+  if(typeof text!=='string'||!text.trim()||text.length>200000)throw Error('Texte vide ou trop long.');
+  const {flow}=await findFlow(flowId);const e=flow.ledger.find(x=>x.id===entryId);if(!e)throw Error('Synchronisation introuvable.');
+  await serial(()=>setEntryState(flowId,entryId,'pending-insert'));
+  let tab=(await allTabs()).find(t=>PL.conversationOf(t.url||'')?.url===e.to),result;
+  try{
+    if(tab)await focus(tab);else tab=await api.tabs.create({url:e.to,active:true,pinned:false});
+    if(!await waitLoaded(tab.id))result={status:'not-loaded'};
+    else{const f=await api.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:R.insertDraft,args:[text]});result=f?.[0]?.result||{status:'not-inserted'};}
+  }catch(err){result={status:'injection-failed',error:String(err?.message||err).slice(0,160)};}
+  const why={'not-loaded':'La conversation de destination n’a pas pu être chargée (supprimée, autre compte ou hors ligne).','no-composer':'Zone de saisie introuvable dans la conversation de destination.',
+    draft:'La zone de saisie contient déjà un brouillon : rien n’a été remplacé.','not-inserted':'Insertion non vérifiée.','injection-failed':'Safari n’autorise pas AI Flow sur cette page.'}[result.status];
+  await serial(()=>setEntryState(flowId,entryId,result.status==='inserted'?'inserted':'failed',why));
+  return result;
+}
+async function removeFlow(flowId,withCheckpoint){
+  const {flows,flow}=await findFlow(flowId);
+  await saveFlows(flows.filter(x=>x.id!==flowId));
+  if(withCheckpoint&&flow.checkpointId)await save(K.drafts,A.cleanCheckpoints(await load(K.drafts,[])).filter(d=>d.id!==flow.checkpointId));
+  return true;
 }
 async function openUrl(url){
   const conv=PL.conversationOf(url);if(!conv)throw Error('Lien non pris en charge');
@@ -476,8 +653,20 @@ async function handle(message,sender){
     case 'openPlatform':return openPlatform(payload?.platform);
     case 'openUrl':return openUrl(String(payload?.url||''));
     case 'captureConversation':return captureConversation(origin==='page'?Number(payload?.tabId):sender.tab.id);
-    case 'openAndInsert':return openAndInsert(payload?.platform,payload?.text,payload?.insert!==false,payload?.checkpointId);
+    case 'openAndInsert':return openAndInsert(payload?.platform,payload?.text,payload?.insert!==false,payload?.checkpointId,payload?.link);
     case 'connectionStatuses':return connectionStatuses();
+    case 'flows':return flowsList();
+    case 'flowLinkCheckpoint':return linkCheckpoint(String(payload?.checkpointId||''));
+    case 'flowUnlink':return removeFlow(String(payload?.flowId||''),false);
+    case 'flowDelete':return removeFlow(String(payload?.flowId||''),true);
+    case 'syncCapture':return syncCapture(String(payload?.flowId||''),payload?.from);
+    case 'syncPrepare':return syncPrepare(payload);
+    case 'syncInsert':return syncInsert(String(payload?.flowId||''),String(payload?.entryId||''),payload?.text);
+    case 'syncState':{
+      if(!['confirmed','cancelled','failed'].includes(payload?.state))throw Error('État inconnu.');
+      return setEntryState(String(payload?.flowId||''),String(payload?.entryId||''),payload.state,payload.error);
+    }
+    case 'syncDraft':{const {flow}=await findFlow(String(payload?.flowId||''));const e=flow.ledger.find(x=>x.id===payload?.entryId);return e?{entry:{...e,seen:undefined,draft:undefined},draft:await openDraft(e.draft)}:null;}
     case 'conversationTabs':if(origin!=='page')throw Error('Origine non autorisée');return conversationTabs();
     case 'refresh':return autoRefresh(PL.ids(),true);
     case 'autoRefresh':{
@@ -509,7 +698,7 @@ async function handle(message,sender){
     default:throw Error('Commande inconnue');
   }
 }
-const DIRECT_OPS=new Set(['devInfo','devCheckUpdate','reload','exportData','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert','conversationTabs']);
+const DIRECT_OPS=new Set(['devInfo','devCheckUpdate','reload','exportData','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert','conversationTabs','syncCapture','syncInsert']);
 api.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message?.type!=='AI_FLOW')return false;
   // Ouvertures d'onglets et lectures : immédiates, sans attendre la file des écritures.
@@ -545,4 +734,4 @@ async function catchUp(){
 }
 api.runtime.onStartup?.addListener(()=>serial(async()=>{await install();await catchUp();}));
 serial(install);
-if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,linkDestination,conversationTabs,exportData,importData,devInfo,captureConversation,recordInterruptions});
+if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,createFlow,loadFlows,syncCapture,syncPrepare,setEntryState,syncInsert,removeFlow,flowsList,linkCheckpoint,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,linkDestination,conversationTabs,exportData,importData,devInfo,captureConversation,recordInterruptions});

@@ -1,6 +1,7 @@
 (async function(){
   'use strict';
-  const A=window.AIFlow,U=window.AIFlowUI,$=id=>document.getElementById(id),esc=A.escapeHTML,K=A.KEYS;
+  if(new URLSearchParams(location.search).has('sync'))return; // vue « Synchroniser les avancées » : sync-view.js
+  const A=window.AIFlow,U=window.AIFlowUI,S=window.AIFlowSync,$=id=>document.getElementById(id),esc=A.escapeHTML,K=A.KEYS;
   const HINTS={goal:'Ce que tu cherches à obtenir.',context:'Projet, public, technologies, liens utiles…',decisions:'Ce qui est déjà tranché et ne doit pas être remis en question.',
     constraints:'Délais, ton, format, limites techniques…',done:'Ce qui est terminé.',problems:'Ce qui bloque encore ou reste à corriger.',next:'Les prochaines étapes, dans l’ordre.',excerpt:'Code, chiffres, liens à transmettre tels quels.'};
   const DEST=['claude','chatgpt'];
@@ -35,6 +36,10 @@
     const w=$('size-warn');
     w.textContent=e.level==='ok'?'':e.level==='large'?`Volumineux pour ${dest} : le texte risque d’être converti en pièce jointe ou tronqué. Préfère « Continuité intelligente » ou une taille plus courte.`:`Trop volumineux pour ${dest} : réduis la taille maximale ou passe en « Continuité intelligente ».`;
     w.className='fine '+(e.level==='ok'?'':'warn');
+    // Privacy Layer : secrets évidents détectés localement, masquables avant l'envoi.
+    const sec=S.findSecrets($('preview').value);
+    $('secret-warn').hidden=!sec.length;
+    if(sec.length)$('secret-warn').querySelector('span').textContent=`${sec.length} secret${sec.length>1?'s':''} probable${sec.length>1?'s':''} détecté${sec.length>1?'s':''} (${[...new Set(sec.map(x=>x.type))].join(', ')}) : vérifie avant l’envoi.`;
   }
   function update(){
     const {text,tr}=compose();
@@ -77,6 +82,7 @@
     }catch(e){$('pick-why').textContent=e.message||'Lecture impossible.';b.disabled=false;}
   }
   function useCapture(c){
+    $('link-row').hidden=!c.url;
     capture=c;$('pick').hidden=true;$('drop-capture').hidden=false;$('mode-note').hidden=true;$('budget').disabled=false;
     $('source-head').textContent='Conversation récupérée';
     for(const r of document.querySelectorAll('input[name="mode"]'))r.disabled=false;
@@ -147,6 +153,7 @@
     try{await navigator.clipboard.writeText(text);return true;}
     catch{$('preview').focus();$('preview').select();return false;}
   }
+  $('mask-secrets').onclick=()=>{$('preview').value=S.maskSecrets($('preview').value);manual=true;$('regen').hidden=false;size();};
   $('copy').onclick=async()=>{
     const text=$('preview').value.trim();if(!text){$('status').textContent='Le message est vide.';return;}
     $('status').textContent=await copy(text)?'Copié. Colle-le (⌘V) dans la nouvelle conversation et relis-le avant d’envoyer.':'Copie refusée : le texte est sélectionné, fais ⌘C.';
@@ -159,10 +166,13 @@
     if(draftId||capture)await saveCheckpoint(true);
     const btn=$('go');btn.disabled=true;$('status').textContent=`Ouverture de ${name(t)}…`;
     try{
-      const r=await A.request('openAndInsert',{platform:t,text,insert:$('auto-insert').checked,checkpointId:draftId||null},{timeout:30000});
+      // Association demandée explicitement : le Flow naît quand la conversation de destination existe (après ton envoi).
+      const link=$('link-flow').checked&&capture?.url&&draftId?{sourceUrl:capture.url,title:$('title').value.trim()||capture.title,sourceTitle:capture.title,seen:S.baselineFrom(capture.messages),decisions:S.seedDecisions(capture.messages,capture.platform)}:null;
+      const r=await A.request('openAndInsert',{platform:t,text,insert:$('auto-insert').checked,checkpointId:draftId||null,link},{timeout:30000});
       $('status').textContent=r.status==='inserted'?`Inséré dans ${name(t)}. Relis puis envoie toi-même.`
         :r.status==='opened'?`${name(t)} est ouvert. ${copied?'Colle le message (⌘V)':'Copie le message'} puis envoie-le.`
         :`${name(t)} est ouvert, mais l’insertion automatique n’a pas fonctionné${r.status==='draft'?' (un brouillon était déjà présent)':''}. ${copied?'Le message est copié : colle-le (⌘V).':'Copie le message puis colle-le.'} [${r.status}]`;
+      if(link)$('status').textContent+=` Les conversations seront liées dès que la conversation ${name(t)} aura été créée par ton envoi.`;
     }catch(e){$('status').textContent=e.message;}
     finally{btn.disabled=false;}
   };
