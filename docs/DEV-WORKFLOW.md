@@ -24,7 +24,7 @@ Ton Mac : AI Flow Dev vérifie toutes les heures ─► « Une nouvelle version 
 | App de développement | `AI Flow Dev`, identifiant `ai.flow.dev`, lien `aiflow-dev://` |
 | Extension Safari | `AI Flow Dev`, identifiant `ai.flow.dev.Extension` |
 | Future app publique | `ai.flow.app` / `ai.flow.app.Extension`, lien `aiflow://` (séparée : les deux peuvent coexister) |
-| Flux de mises à jour | `https://github.com/<toi>/<dépôt>/releases/download/dev-channel/appcast.xml` |
+| Flux de mises à jour | `https://github.com/lcnd777/ai-flow/releases/download/dev-channel/appcast.xml` |
 | Numéro de build | numéro d’exécution GitHub Actions : toujours croissant |
 
 Safari range les données de l’extension sous son identifiant. Comme celui-ci ne change jamais, une mise à jour conserve réglages, historique, points de reprise, relances et autorisations de sites.
@@ -60,7 +60,7 @@ Le critère « plus aucune manipulation » n’est donc **atteignable qu’avec 
 Dès que ces secrets existent, la compilation suivante signe et notarise automatiquement. Il n’y a rien d’autre à modifier.
 
 ### 3. Installation initiale (une seule fois)
-1. Ouvre `https://github.com/<toi>/<dépôt>/releases/tag/dev-channel` et télécharge **AI-Flow-Dev.zip**. C’est le seul téléchargement manuel : les versions suivantes arrivent par l’app.
+1. Ouvre `https://github.com/lcnd777/ai-flow/releases/tag/dev-channel` et télécharge **AI-Flow-Dev.zip**. C’est le seul téléchargement manuel : les versions suivantes arrivent par l’app.
 2. Glisse **AI Flow Dev** dans **Applications** et ouvre-la.
 3. Safari › Réglages › **Extensions** : active **AI Flow Dev** et autorise claude.ai et chatgpt.com.
 4. Dans l’ancienne extension temporaire : Paramètres › Version et mises à jour › **Sauvegarder mes données**. Dans AI Flow Dev : **Restaurer une sauvegarde…**. Puis retire l’extension temporaire (Safari › Réglages › Développeur).

@@ -19,7 +19,7 @@ settings:
     CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: "-"             # signature ad hoc par défaut ; Developer ID si les secrets existent
     DEVELOPMENT_TEAM: ""
-    AIFLOW_FEED_URL: "https://github.com/OWNER/REPO/releases/download/dev-channel/appcast.xml"
+    AIFLOW_FEED_URL: "https://github.com/lcnd777/ai-flow/releases/download/dev-channel/appcast.xml"
 packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
