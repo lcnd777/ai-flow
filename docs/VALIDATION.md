@@ -57,3 +57,9 @@ Sans app Mac, Safari ne répond jamais à un appel natif, ce que Chromium ne rep
 - Intégration : infobulle de l’historique, transfert d’une conversation complète, insertion sans envoi dans ChatGPT, modes Awake et commande `pmset`, seuil d’alerte, Flow Recovery de bout en bout (interruption, réouverture, « Reprendre »).
 
 **Limite du test d’intégration** : un onglet ouvert par l’extension elle-même échappe aux sites simulés. L’insertion automatique est donc vérifiée avec la même fonction sur un onglet ChatGPT simulé déjà ouvert. Sur les vrais sites, les sélecteurs de la zone de saisie restent à confirmer.
+
+## Cycle de mise à jour validé sur le Mac de l’utilisateur (31 octobre 2026)
+- Installation initiale d’AI Flow Dev (build 4, signature ad hoc), puis activation de l’extension dans Safari.
+- Publication automatique du build 5 par GitHub Actions : tests, compilation macOS 15, test de lancement, signature Ed25519, appcast.
+- Mise à jour via Sparkle (« Rechercher des mises à jour… » › Installer et relancer) : nouvelle version active (« 0.11.0 dev 5 »), réglages conservés.
+- Problème rencontré et corrigé : avec la signature ad hoc, le runtime renforcé refusait de charger Sparkle.framework (« different Team IDs »). Le runtime renforcé n’est donc activé qu’avec Developer ID, et la CI lance l’app 10 s avant toute publication.
