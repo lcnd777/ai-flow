@@ -134,7 +134,7 @@ async function syncOnce(env,flowId,from,choices={}){
   const entries=r.entries.map(e=>({...e,item:r.items.find(i=>i.id===e.itemId)}));
   const included=new Set(r.items.filter(i=>!i.secret).map(i=>i.id));
   const packet=S.buildPacket({title:'Tarifs',from:'x',to:'y',items:r.items,entries,choices,included,delta:r.delta});
-  const p=await call('syncPrepare',{flowId,from:r.from,to:r.to,packet,ops:S.decisionOps(entries,choices,included),seen:r.seen,counts:{items:included.size}});
+  const p=await call('syncPrepare',{flowId,baseRev:r.flow.rev,from:r.from,to:r.to,packet,ops:S.decisionOps(entries,choices,included),seen:r.seen,counts:{items:included.size}});
   return {r,p,packet,entries};
 }
 test('premier transfert Claude → ChatGPT avec liaison : Flow créé, point de départ enregistré, rien sans confirmation',async()=>{
@@ -247,4 +247,69 @@ test('migration : anciennes données sans Flow intactes, point de reprise relié
   env.fb.addTab(CL);env.convs[CL]=[{id:'c1',role:'user',text:'Bonjour'}];
   const r=await env.call('syncCapture',{flowId:f.id,from:CL});assert.equal(r.delta.firstSync,true);
   assert.equal((await env.call('flowLinkCheckpoint',{checkpointId:'old'})).id,f.id,'pas de second Flow sur les mêmes conversations');
+});
+
+// Regressions de reprise : une prévisualisation périmée ou illisible ne consomme aucun contexte.
+test('préparation depuis une ancienne capture refusée sans annuler le nouveau brouillon',async()=>{
+  const env=setup(),flow=await linkedFlow(env),{call,convs}=env;
+  convs[GP]=[{id:'g1',role:'user',text:'On garde SQLite pour la base.'}];
+  const old=await syncOnce(env,flow.id,GP);
+  await call('syncState',{flowId:flow.id,entryId:old.p.entryId,state:'confirmed'});
+  convs[GP].push({id:'g2',role:'assistant',text:'J’ai ajouté la FAQ.'});
+  await syncOnce(env,flow.id,GP);
+  const before=JSON.stringify(env.fb.store);
+  await assert.rejects(call('syncPrepare',{flowId:flow.id,from:GP,to:CL,baseRev:old.r.flow.rev,packet:old.packet,seen:old.r.seen}),/récupère à nouveau/);
+  assert.equal(JSON.stringify(env.fb.store),before);
+  await assert.rejects(call('syncPrepare',{flowId:flow.id,from:GP,to:CL,packet:old.packet,seen:old.r.seen}),/récupère à nouveau/);
+  assert.equal(JSON.stringify(env.fb.store),before);
+});
+test('insertion périmée refusée avant de toucher la conversation de destination',async()=>{
+  const env=setup(),flow=await linkedFlow(env),{call,convs}=env;
+  convs[GP]=[{id:'g1',role:'assistant',text:'J’ai terminé la grille des prix.'}];
+  convs[CL].push({id:'c3',role:'assistant',text:'J’ai ajouté la FAQ.'});
+  const old=await syncOnce(env,flow.id,GP),other=await syncOnce(env,flow.id,CL);
+  await call('syncState',{flowId:flow.id,entryId:other.p.entryId,state:'confirmed'});
+  const before=JSON.stringify(env.fb.store);
+  await assert.rejects(call('syncInsert',{flowId:flow.id,entryId:old.p.entryId,text:old.packet}),/a changé/);
+  assert.equal(JSON.stringify(env.fb.store),before);
+  assert.ok([...env.fb.tabs.values()].every(t=>!t.inserted));
+});
+for(const damage of ['missing-draft','corrupt-draft','lost-key','corrupt-decisions']){
+  test('confirmation préserve intégralement les données : '+damage,async()=>{
+    const env=setup(),flow=await linkedFlow(env),{call,convs}=env;
+    convs[GP]=[{id:'g1',role:'user',text:'On garde SQLite pour la base.'}];
+    const s=await syncOnce(env,flow.id,GP);
+    const raw=env.fb.store.ai_flow_flows_v1.flows[0];
+    if(damage==='missing-draft')raw.ledger[0].draft=null;
+    if(damage==='corrupt-draft')raw.ledger[0].draft.sealed.ct='invalid';
+    if(damage==='lost-key')env.ctx.__AIFLOW_VAULT_MEMORY__.key=null;
+    if(damage==='corrupt-decisions')raw.sealed.ct='invalid';
+    const before=JSON.stringify(env.fb.store);
+    await assert.rejects(call('syncState',{flowId:flow.id,entryId:s.p.entryId,state:'confirmed'}),/illisible/);
+    assert.equal(JSON.stringify(env.fb.store),before,'ni référence, ni décisions, ni point de reprise modifiés');
+  });
+}
+test('Flow illisible : préparation refusée sans remplacer le brouillon récupérable',async()=>{
+  const env=setup(),flow=await linkedFlow(env),{call,convs}=env;
+  convs[GP]=[{id:'g1',role:'assistant',text:'J’ai ajouté la FAQ.'}];
+  const s=await syncOnce(env,flow.id,GP);
+  env.ctx.__AIFLOW_VAULT_MEMORY__.key=null;
+  const before=JSON.stringify(env.fb.store);
+  await assert.rejects(call('syncPrepare',{flowId:flow.id,baseRev:s.r.flow.rev,from:GP,to:CL,packet:s.packet,seen:s.r.seen}),/illisible/);
+  assert.equal(JSON.stringify(env.fb.store),before);
+});
+test('reprise après interruption : une insertion déjà en attente est revalidée',async()=>{
+  const env=setup(),flow=await linkedFlow(env),{call,convs}=env;
+  convs[GP]=[{id:'g1',role:'assistant',text:'J’ai terminé la grille des prix.'}];
+  convs[CL].push({id:'c3',role:'assistant',text:'J’ai ajouté la FAQ.'});
+  const old=await syncOnce(env,flow.id,GP),other=await syncOnce(env,flow.id,CL);
+  await env.T.setEntryState(flow.id,old.p.entryId,'pending-insert');
+  await call('syncState',{flowId:flow.id,entryId:other.p.entryId,state:'confirmed'});
+  const before=JSON.stringify(env.fb.store);
+  await assert.rejects(call('syncInsert',{flowId:flow.id,entryId:old.p.entryId,text:old.packet}),/a changé/);
+  assert.equal(JSON.stringify(env.fb.store),before);
+  assert.ok([...env.fb.tabs.values()].every(t=>!t.inserted));
+  // Confirmer à nouveau une entrée déjà confirmée reste idempotent.
+  await call('syncState',{flowId:flow.id,entryId:other.p.entryId,state:'confirmed'});
+  assert.equal(JSON.stringify(env.fb.store),before);
 });

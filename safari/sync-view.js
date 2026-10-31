@@ -29,7 +29,7 @@
     $('sync-head').innerHTML=`<div class="sec-head"><h2>${esc(flow.title)}</h2><button type="button" id="sync-swap" class="ghost small">Inverser le sens</button></div>
       <div class="sync-route"><div><small>Depuis</small><b>${esc(label(from))}</b></div><span aria-hidden="true">→</span><div><small>Vers</small><b>${esc(label(to))}</b></div></div>
       <p class="fine">Dernière synchronisation : ${last?`${esc(when(last.at))} (${esc(name(platformOf(last.from)))} → ${esc(name(platformOf(last.to)))})`:'jamais'}.
-      ${flow.locked?' <span class="warn">Décisions chiffrées illisibles sur cette installation (clé absente) : elles repartiront de zéro à la prochaine synchronisation confirmée.</span>':''}
+      ${flow.locked?' <span class="warn">Décisions chiffrées illisibles sur cette installation (clé absente) : synchronisation bloquée pour les préserver. Reprends sur l’installation d’origine ou dissocie explicitement ce Flow.</span>':''}
       ${encryption?' Décisions conservées chiffrées sur cet appareil.':' Chiffrement local indisponible ici : décisions conservées en clair sur cet appareil.'}</p>`;
     $('sync-swap').onclick=()=>{[from,to]=[to,from];reset();head();};
     $('sync-insert').textContent=`Insérer dans ${name(platformOf(to))}`;
@@ -170,7 +170,7 @@
     const why=blocked();if(why)throw Error(why);
     const ops=res?S.decisionOps(entries,choices,included):[];
     const counts={items:items.filter(i=>included.has(i.id)).length,messages:res?res.delta.fresh+res.delta.modified:0,conflicts:entries.filter(e=>e.relation==='conflict').length};
-    const r=await A.request('syncPrepare',{flowId,from,to,packet:$('sync-packet').value,ops,choices,seen:res?.seen,counts,excluded:items.filter(i=>!included.has(i.id)).map(i=>i.id)});
+    const r=await A.request('syncPrepare',{flowId,baseRev:res?.flow.rev,from,to,packet:$('sync-packet').value,ops,choices,seen:res?.seen,counts,excluded:items.filter(i=>!included.has(i.id)).map(i=>i.id)});
     entryId=r.entryId;return r;
   }
   function after(state,msg){

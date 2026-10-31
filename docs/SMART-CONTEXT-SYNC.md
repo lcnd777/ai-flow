@@ -83,7 +83,7 @@ Aucune dépendance ajoutée, aucun service externe.
 - **Reprise après interruption** : une synchronisation préparée, en attente d'insertion, insérée ou échouée reste dans le journal
   (navigateur fermé, mise à jour de l'extension…) et peut être reprise, confirmée ou annulée.
 - **Concurrence** : écritures sérialisées dans l'arrière-plan ; une préparation est liée à la révision du Flow (`baseRev`) ;
-  si une autre synchronisation a été confirmée entre-temps, la confirmation est refusée (« prépare à nouveau »).
+  si une autre synchronisation a été confirmée entre-temps, la préparation issue d’une ancienne capture, l’insertion et la confirmation sont refusées (« prépare à nouveau »).
   Une nouvelle préparation dans le même sens remplace la précédente.
 
 ## 5. Décisions et conflits
@@ -119,7 +119,8 @@ Le mode déterministe actuel reste le fonctionnement de référence.
    les autres données (titres, adresses, empreintes, journal) restent en clair. Limite : le code de l'extension peut utiliser la clé ;
    le chiffrement protège contre la lecture directe des fichiers, pas contre une extension compromise. Sans IndexedDB/WebCrypto,
    l'interface indique « Chiffrement local indisponible ici ». Une sauvegarde restaurée ailleurs ne contient pas la clé : les décisions
-   y sont signalées illisibles et repartent de zéro.
+   y sont signalées illisibles et les préparations / confirmations sont bloquées pour préserver le contenu chiffré.
+   Il faut reprendre sur l’installation d’origine ou dissocier explicitement le Flow.
 6. Secrets évidents (clés API, jetons GitHub/AWS/Slack, clés privées, JWT, « mot de passe : … », IBAN) détectés localement :
    éléments décochés et secrets masqués par défaut ; aussi signalés dans Smart Transfer.
 7. Le contenu des conversations est traité comme des données : aucune instruction trouvée dans un message n'est exécutée ;

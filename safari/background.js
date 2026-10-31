@@ -375,6 +375,9 @@ async function syncPrepare(p){
   const {flows,flow}=await findFlow(p?.flowId);
   const from=PL.conversationOf(p.from||'')?.url,to=PL.conversationOf(p.to||'')?.url;
   if(!flow.ends.some(e=>e.url===from)||!flow.ends.some(e=>e.url===to)||from===to)throw Error('Direction de synchronisation invalide.');
+  // La révision vient de la capture, jamais du Flow relu après une confirmation concurrente.
+  if(!Number.isInteger(p.baseRev)||p.baseRev!==flow.rev)throw Error('Le Flow a changé ou la capture est périmée : récupère à nouveau les avancées.');
+  if((await openSecret(flow)).locked)throw Error('Décisions chiffrées illisibles : reprends sur l’installation d’origine ou dissocie explicitement le Flow. Aucune donnée n’a été remplacée.');
   const packet=String(p.packet||'');if(!packet.trim()||packet.length>200000)throw Error('Message de mise à jour vide ou trop long.');
   const now=Date.now();
   // Une nouvelle préparation remplace la précédente dans le même sens (contexte modifié entre-temps).
@@ -389,16 +392,22 @@ async function syncPrepare(p){
 async function setEntryState(flowId,entryId,state,error){
   const {flows,flow}=await findFlow(flowId);
   const e=flow.ledger.find(x=>x.id===entryId);if(!e)throw Error('Synchronisation introuvable.');
-  if(e.state===state)return {state};
-  if(!S.canTransition(e.state,state))throw Error(`Transition impossible : ${S.LEDGER_LABEL[e.state]} → ${S.LEDGER_LABEL[state]||state}.`);
+  // Une insertion interrompue peut être reprise : même état, mais révision à revalider.
+  if(e.state===state&&state!=='pending-insert')return {state};
+  if(e.state!==state&&!S.canTransition(e.state,state))throw Error(`Transition impossible : ${S.LEDGER_LABEL[e.state]} → ${S.LEDGER_LABEL[state]||state}.`);
   const now=Date.now();
-  if(state==='confirmed'){
+  // Refuser aussi AVANT l’insertion : un paquet périmé ne doit pas atteindre la destination.
+  if(state==='confirmed'||state==='pending-insert'){
     if(e.baseRev!==flow.rev)throw Error('Le Flow a changé depuis la préparation (une autre synchronisation a été confirmée) : prépare à nouveau pour éviter les doublons.');
+  }
+  if(state==='confirmed'){
     const draft=await openDraft(e.draft);
+    if(!draft||typeof draft.packet!=='string'||!Array.isArray(draft.ops))throw Error('Brouillon illisible : récupère à nouveau les avancées. Rien n’a été marqué comme synchronisé.');
+    const secret=await openSecret(flow);
+    if(secret.locked)throw Error('Décisions chiffrées illisibles : confirmation refusée pour préserver les données existantes. Reprends sur l’installation d’origine ou dissocie explicitement le Flow.');
     const from=flow.ends.find(x=>x.url===e.from);
     from.baseline=S.mergeSeen(from.baseline,e.seen,now);
-    const secret=await openSecret(flow);
-    secret.decisions=S.applyDecisionOps(secret.decisions,draft?.ops||[],{platform:from.platform},now);
+    secret.decisions=S.applyDecisionOps(secret.decisions,draft.ops,{platform:from.platform},now);
     delete secret.pending[e.from];
     await closeSecret(flow,secret);
     flow.rev++;flow.lastSync={at:now,from:e.from,to:e.to};

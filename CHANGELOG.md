@@ -1,3 +1,10 @@
+## Non publié — Fiabilité de Smart Context Sync et de la reprise
+
+- Une capture conserve sa révision jusqu’à la préparation : un aperçu périmé ne peut plus remplacer un brouillon récent.
+- Une synchronisation périmée est refusée avant insertion dans la conversation de destination.
+- Un brouillon absent / illisible ou des décisions indéchiffrables bloquent la confirmation sans avancer la référence ni modifier le point de reprise. Les données chiffrées existantes sont conservées.
+- Les Flows dont la clé est absente ne repartent plus silencieusement de zéro : reprise sur l’installation d’origine ou dissociation explicite.
+
 ## 0.13.0 — Smart Context Sync
 
 Travailler → changer d’IA → continuer → **synchroniser les avancées** → reprendre sans réexpliquer. Détails : [docs/SMART-CONTEXT-SYNC.md](docs/SMART-CONTEXT-SYNC.md).
