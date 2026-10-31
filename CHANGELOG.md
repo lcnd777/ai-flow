@@ -1,3 +1,7 @@
+## 0.12.3 — Retrait des quotas dans la barre de menus
+
+- Les quotas dans la barre de menus macOS sont retirés : ils ne s’affichaient pas sur le Mac de test et la cause n’a pas pu être établie avec certitude. L’icône ⚡ garde les mises à jour, le maintien éveillé et les réglages. Les données associées sont supprimées automatiquement.
+
 ## 0.12.2 — Transfert proposé seulement là où il fonctionne
 
 - Les boutons « Transférer », « Point de reprise » et « Transférer le contexte » n’apparaissent plus sur les pages qu’AI Flow ne sait pas lire : sessions **Claude Code**, tâches **Codex**, pages d’accueil. Ils restent sur les conversations Claude (/chat/…) et ChatGPT (/c/…), dans la pastille comme dans la fenêtre AI Flow.

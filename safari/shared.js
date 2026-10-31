@@ -509,14 +509,6 @@
     }).sort((a,b)=>a.rank-b.rank||b.updatedAt-a.updatedAt);
   }
   // Résumé pour la barre de menus macOS : uniquement des chiffres lus, leurs dates et l'état ; aucun contenu.
-  function menuSnapshot(state,now=Date.now()){
-    return {v:1,at:now,platforms:visiblePlatforms(state).filter(pid=>PL.get(pid).support!=='none').map(pid=>{
-      const st=platformStatus(state,pid,now),run=platformRunway(state,pid,now);
-      return {id:pid,name:PL.get(pid).name,radar:st.radar,updatedAt:st.updatedAt,
-        risk:runwayWorthShowing(run)&&['risk','risk-uncertain','reached'].includes(run.kind)?runwayText(run,now):'',
-        metrics:st.ids.filter(id=>state.metrics[id]).map(id=>{const m=state.metrics[id];return {label:METRICS[id].short,percent:Math.round(m.percent),resetAt:m.resetAt||null,observedAt:m.observedAt};})};
-    })};
-  }
   function formatReset(resetAt,now=Date.now()){
     if(!resetAt)return 'Reset non communiqué';const min=Math.ceil((resetAt-now)/60000);
     if(min<=0)return 'Reset à confirmer';if(min<60)return `Reset dans ${min} min`;
@@ -539,5 +531,5 @@
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
     runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,smartSwitch,notificationEvents,describeEvents,
-    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,cleanCheckpoints,timelineItems,menuSnapshot,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
+    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,cleanCheckpoints,timelineItems,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

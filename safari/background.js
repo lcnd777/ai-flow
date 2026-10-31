@@ -109,7 +109,6 @@ async function refreshPlatform(pid,tab){
     }
     const {state}=await write('metrics',{platform:pid,readings});
     await save(K.history,A.recordHistory(await load(K.history,null),readings));
-    await syncMenuBar();
     await notify(state);
   }else if(result.status==='login'){
     // Déconnecté : les anciens pourcentages ne sont plus attribuables à un compte.
@@ -304,25 +303,6 @@ async function importData(backup){
   return {keys:entries.length};
 }
 
-/* ---------- Barre de menus macOS : mêmes données que la fenêtre et la pastille ---------- */
-const MENU_SYNC='ai_flow_menu_sync_v1';
-async function syncMenuBar(force=false){
-  if(!hasNative())return {sent:false,reason:'native'};
-  const state=await A.getState(),now=Date.now(),snap=A.menuSnapshot(state,now);
-  const sig=JSON.stringify(snap.platforms),last=await load(MENU_SYNC,{});
-  // Envoi seulement si les données ont changé (ou toutes les 10 min, pour l'indication de fraîcheur).
-  // Après un échec (app fermée, pas de réponse), on réessaie au prochain relevé au lieu d'attendre 10 min.
-  if(!force&&last.ok&&last.sig===sig&&now-(last.at||0)<10*60000)return {sent:false,reason:'unchanged'};
-  const reply=await nativeCall({type:'AI_FLOW_SNAPSHOT',snapshot:snap});
-  const ok=!!reply?.ok,error=ok?null:!reply?'no-reply':reply.error==='app-not-running'||reply.appRunning===false?'app-not-running':String(reply.error||'refused').slice(0,40);
-  const rec={sig,at:now,ok,error,platforms:snap.platforms.filter(p=>p.metrics.length).length};
-  await save(MENU_SYNC,rec);
-  return {sent:true,ok,error,at:now,platforms:rec.platforms};
-}
-async function menuBarStatus(){
-  const last=await load(MENU_SYNC,{});
-  return {native:hasNative(),at:last.at||null,ok:!!last.ok,error:last.error||null,platforms:last.platforms??null};
-}
 // Onglets de conversation ouverts (Claude, ChatGPT) : adresse et titre seulement, pour choisir quoi récupérer.
 async function conversationTabs(){
   const out=[];
@@ -498,8 +478,6 @@ async function handle(message,sender){
     case 'captureConversation':return captureConversation(origin==='page'?Number(payload?.tabId):sender.tab.id);
     case 'openAndInsert':return openAndInsert(payload?.platform,payload?.text,payload?.insert!==false,payload?.checkpointId);
     case 'connectionStatuses':return connectionStatuses();
-    case 'menuBarSync':if(origin!=='page')throw Error('Origine non autorisée');return syncMenuBar(true);
-    case 'menuBarStatus':return menuBarStatus();
     case 'conversationTabs':if(origin!=='page')throw Error('Origine non autorisée');return conversationTabs();
     case 'refresh':return autoRefresh(PL.ids(),true);
     case 'autoRefresh':{
@@ -531,7 +509,7 @@ async function handle(message,sender){
     default:throw Error('Commande inconnue');
   }
 }
-const DIRECT_OPS=new Set(['devInfo','devCheckUpdate','reload','exportData','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert','menuBarStatus','conversationTabs']);
+const DIRECT_OPS=new Set(['devInfo','devCheckUpdate','reload','exportData','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert','conversationTabs']);
 api.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message?.type!=='AI_FLOW')return false;
   // Ouvertures d'onglets et lectures : immédiates, sans attendre la file des écritures.
@@ -540,7 +518,7 @@ api.runtime.onMessage.addListener((message,sender,reply)=>{
   return true;
 });
 api.alarms.onAlarm.addListener(alarm=>{
-  if(alarm.name===ALARM)serial(async()=>{await autoRefresh(PL.ids());await syncKeepAwake();await badge();await catchUp();await syncMenuBar();});
+  if(alarm.name===ALARM)serial(async()=>{await autoRefresh(PL.ids());await syncKeepAwake();await badge();await catchUp();});
   else if(alarm.name.startsWith('ai-flow-resume:'))serial(()=>fireResume(alarm.name.slice('ai-flow-resume:'.length)));
 });
 api.notifications?.onClicked?.addListener(id=>serial(async()=>{
@@ -556,7 +534,7 @@ async function install(){
 }
 api.runtime.onInstalled.addListener(()=>serial(async()=>{
   // Migration 0.8.0 : suppression des anciens suivis (rechargeaient des onglets) et clés obsolètes.
-  try{await api.storage.local.remove(['ai_flow_trackers_v3','ai_flow_alerts_v3','ai_flow_claude_org_v1','ai_flow_native_status']);}catch{}
+  try{await api.storage.local.remove(['ai_flow_trackers_v3','ai_flow_alerts_v3','ai_flow_claude_org_v1','ai_flow_native_status','ai_flow_menu_sync_v1']);}catch{}
   const s=await A.getState();await api.storage.local.set({[A.KEY]:s});
   await install();
 }));
@@ -567,4 +545,4 @@ async function catchUp(){
 }
 api.runtime.onStartup?.addListener(()=>serial(async()=>{await install();await catchUp();}));
 serial(install);
-if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,linkDestination,syncMenuBar,menuBarStatus,conversationTabs,exportData,importData,devInfo,captureConversation,recordInterruptions});
+if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,linkDestination,conversationTabs,exportData,importData,devInfo,captureConversation,recordInterruptions});

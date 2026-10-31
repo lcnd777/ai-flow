@@ -79,32 +79,6 @@ test('suppression des données : « Supprimer tous les relevés » efface relev�
   assert.deepEqual(JSON.parse(JSON.stringify(A.clean(fb.store.ai_flow_state_v1).metrics)),{});
   assert.equal(fb.store.ai_flow_drafts_v1.length,1,'les points de reprise ne sont pas effacés avec les relevés');
 });
-test('barre de menus macOS : résumé fidèle, envoyé seulement s’il change, sans contenu de conversation',async()=>{
-  const now=Date.now();
-  const s=A.clean({metrics:{'claude.session':{percent:42.4,source:'observed',observedAt:now,resetAt:now+H},'codex.weekly':{percent:12,source:'observed',observedAt:now-20*60000,resetAt:now+3*24*H}}});
-  const snap=JSON.parse(JSON.stringify(A.menuSnapshot(s,now)));
-  const claude=snap.platforms.find(p=>p.id==='claude'),codex=snap.platforms.find(p=>p.id==='codex');
-  assert.equal(claude.metrics[0].percent,42);assert.equal(claude.radar,'available');
-  assert.equal(codex.radar,'stale','relevé de plus de 15 min : signalé périmé');
-  assert.ok(!snap.platforms.some(p=>p.id==='chatgpt'),'ChatGPT non mesuré : absent');
-  const {fb,T}=bg({native:true,nativeReply:()=>({ok:true})});
-  fb.store.ai_flow_state_v1={metrics:{'claude.session':{percent:42,source:'observed',observedAt:now,resetAt:now+H}}};
-  assert.equal((await T.syncMenuBar()).sent,true);
-  assert.equal((await T.syncMenuBar()).sent,false,'inchangé : pas de renvoi');
-  const sent=fb.native.filter(m=>m.type==='AI_FLOW_SNAPSHOT');
-  assert.equal(sent.length,1);assert.ok(!JSON.stringify(sent[0]).match(/messages|text/));
-});
-test('barre de menus : après un échec (app fermée), renvoi au relevé suivant et état lisible',async()=>{
-  const now=Date.now();let running=false;
-  const {fb,T,call}=bg({native:true,nativeReply:m=>m.type==='AI_FLOW_SNAPSHOT'?(running?{ok:true,appRunning:true}:{ok:false,error:'app-not-running',appRunning:false}):{ok:true}});
-  fb.store.ai_flow_state_v1={metrics:{'claude.session':{percent:42,source:'observed',observedAt:now,resetAt:now+H}}};
-  const r1=await T.syncMenuBar();assert.equal(r1.ok,false);assert.equal(r1.error,'app-not-running');
-  assert.equal((await T.menuBarStatus()).error,'app-not-running');
-  running=true;
-  const r2=await T.syncMenuBar();assert.equal(r2.sent,true,'données inchangées mais échec précédent : renvoi');assert.equal(r2.ok,true);
-  const st=(await call('menuBarStatus')).value;assert.equal(st.ok,true);assert.equal(st.platforms,1);assert.equal(st.error,null);
-  assert.equal((await call('menuBarSync')).value.sent,true,'envoi forcé depuis les Paramètres');
-});
 test('liste des conversations ouvertes : uniquement Claude/ChatGPT, et refusée depuis une page web',async()=>{
   const {fb,call}=bg();
   fb.addTab('https://claude.ai/chat/abc',{title:'Tarifs - Claude'});

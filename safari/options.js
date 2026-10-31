@@ -130,22 +130,6 @@
     finally{$('data-file').value='';}
   };
   dev();
-  // Barre de menus : état réel du dernier envoi à l'app (réussi, app fermée, pas de réponse).
-  const MENU_ERR={'app-not-running':'échec — l’app AI Flow Dev n’est pas ouverte (lance-la depuis Applications)','no-reply':'échec — pas de réponse de l’app (composant natif)'};
-  function menuText(r){
-    if(!r.native)return 'indisponible ici (sans l’app Mac)';
-    if(!r.at)return 'aucun envoi pour l’instant';
-    const when=A.dayClock(r.at);
-    if(r.ok)return r.platforms?`réussi ${when} (${r.platforms} plateforme${r.platforms>1?'s':''})`:`réussi ${when}, mais aucun quota relevé à afficher`;
-    return `${MENU_ERR[r.error]||'échec — l’app a refusé les données'} · ${when}`;
-  }
-  async function menuState(){try{$('menu-state').textContent=menuText(await A.request('menuBarStatus'));}catch{$('menu-state').textContent='inconnu';}}
-  $('menu-send').onclick=async()=>{
-    const b=$('menu-send');b.disabled=true;$('menu-state').textContent='Envoi…';
-    try{const r=await A.request('menuBarSync',null,{timeout:8000});$('menu-state').textContent=menuText({native:r.reason!=='native',...r});}
-    catch(e){$('menu-state').textContent=e.message;}finally{b.disabled=false;}
-  };
-  menuState();
   async function reload(){try{state=await A.getState();}catch{}auto=(await U.loadExtras()).auto;try{conn=await A.request('connectionStatuses');}catch{}render();}
   U.bindNav(document);render();await reload();awake();
   U.live(()=>{if(!document.activeElement?.closest?.('.prow'))reload();});
