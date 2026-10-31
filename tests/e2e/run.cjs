@@ -72,9 +72,12 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   check('Aucun jeton dans le stockage',!JSON.stringify(await sw.evaluate(()=>chrome.storage.local.get(null))).includes('fake-token'));
 
   // 2. Popup compact : mêmes chiffres que la pastille.
-  const pop=await ctx.newPage();await pop.setViewportSize({width:380,height:600});
+  const pop=await ctx.newPage();await pop.setViewportSize({width:460,height:600});
   await pop.goto(E('popup.html'));await pop.waitForTimeout(1200);
   const popText=await pop.locator('body').innerText();
+  {const p3=await ctx.newPage();await p3.setViewportSize({width:260,height:500});await p3.goto(E('popup.html'));await p3.waitForTimeout(500);
+   const w=await p3.evaluate(()=>document.body.getBoundingClientRect().width);
+   check('Popup : largeur fixe de 460 px, jamais rétrécie (Safari Mac)',Math.round(w)===460,String(w));await p3.close();}
   check('Popup : Claude 30 %',/Claude[\s\S]*30 %/.test(popText));
   check('Popup : Codex affiché avec ses quotas',/Codex[\s\S]*41 %/.test(popText));
   check('Popup : IA sans limites lisibles retirées (ChatGPT, Gemini…)',!/Gemini|Non mesuré|Perplexity/.test(popText)&&!/\bChatGPT\b/.test(popText.replace(/ChatGPT \(Codex\)/g,'')));
@@ -88,7 +91,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
 
   // 3. Navigation du popup : vrais onglets, non épinglés.
   for(const [label,file] of [['Paramètres','options.html'],['Tableau de bord','dashboard.html'],['Transférer','transfer.html']]){
-    const p2=await ctx.newPage();await p2.setViewportSize({width:380,height:600});await p2.goto(E('popup.html'));await p2.waitForTimeout(400);
+    const p2=await ctx.newPage();await p2.setViewportSize({width:460,height:600});await p2.goto(E('popup.html'));await p2.waitForTimeout(400);
     await p2.getByRole('button',{name:label,exact:true}).click();await pop.waitForTimeout(800);
     const t=(await tabsInfo()).find(x=>x.url.startsWith(E(file)));
     check(`Popup › ${label} ouvre ${file} dans un onglet normal`,!!t&&t.pinned===false,JSON.stringify(await tabsInfo()));
@@ -150,7 +153,11 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   check('Tableau de bord : historique conservé, consommation en barres',await dash.locator('#chart svg rect.use').count()>0&&!/Grok/.test(dText));
   await dash.locator('#chart').scrollIntoViewIfNeeded();await dash.waitForTimeout(200);
   const box=await dash.locator('#chart svg').boundingBox();
-  await dash.mouse.move(box.x+box.width-12,box.y+box.height-40);await dash.waitForTimeout(250);
+  // Survole les dernières barres jusqu'à trouver une tranche mesurée (indépendant du changement d'heure).
+  for(let k=0;k<4;k++){
+    await dash.mouse.move(box.x+box.width-12-k*(box.width-54)/24,box.y+box.height-40);await dash.waitForTimeout(250);
+    if(/Consommé/.test(await dash.locator('#tip').innerText().catch(()=>'')))break;
+  }
   const tipText=await dash.locator('#tip').innerText().catch(()=>'');
   check('Historique : infobulle au survol (heure, plateformes, consommation, relevés réels)',await dash.locator('#tip').isVisible()&&/Claude/.test(tipText)&&/Codex/.test(tipText)&&/Consommé/.test(tipText)&&/relevé/.test(tipText),tipText);
   await dash.screenshot({path:path.join(shots,'dashboard-tooltip.png')});
@@ -351,7 +358,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     check('Tableau de bord : conversation liée, dernière synchronisation, décisions validées',/Synchronisé/.test(flowsTxt)&&/décision/.test(flowsTxt)&&/Dissocier/.test(flowsTxt),flowsTxt.slice(0,300));
     await dash2.close();
   }
-  const pop2=await ctx.newPage();await pop2.setViewportSize({width:380,height:600});await pop2.goto(E('popup.html'));await pop2.waitForTimeout(1200);
+  const pop2=await ctx.newPage();await pop2.setViewportSize({width:460,height:600});await pop2.goto(E('popup.html'));await pop2.waitForTimeout(1200);
   check('Popup : points de reprise et travail interrompu accessibles',/point(s)? de reprise/i.test(await pop2.locator('body').innerText()));
   await pop2.screenshot({path:path.join(shots,'popup-continuity.png')});
   await pop2.emulateMedia({colorScheme:'light'});await pop2.waitForTimeout(200);await pop2.screenshot({path:path.join(shots,'popup-light.png')});

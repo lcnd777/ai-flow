@@ -1,3 +1,9 @@
+## 0.13.4 — Fenêtre AI Flow plus grande
+
+- Fenêtre AI Flow de Safari Mac plus large (460 px au lieu d’environ 260 px affichés) et plus haute (600 px), texte plus grand. Une règle prévue pour les petits écrans la rétrécissait par erreur ; elle ne s’applique plus qu’aux écrans tactiles (iPhone, iPad).
+- La prévision n’est plus répétée en haut de la fenêtre : elle reste dans la carte de la plateforme.
+- Test de l’infobulle de consommation rendu indépendant du changement d’heure.
+
 ## 0.13.3 — Smart Switch seulement s’il y a une alternative
 
 - Le Smart Switch ne s’affiche que si au moins une autre plateforme a une capacité confirmée. Exemple corrigé : Claude à 98 % et Codex à 100 % → plus de carte « Aucune autre plateforme… ».
