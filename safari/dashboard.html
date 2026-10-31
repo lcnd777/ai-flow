@@ -15,11 +15,11 @@
       <p class="fine">Les pourcentages viennent uniquement des plateformes elles-mêmes, lus dans tes onglets ouverts. « Indisponible » signifie que la valeur n’a pas pu être lue, jamais 0 %. Les estimations d’autonomie sont calculées localement et signalées comme telles.</p></section>
     <section class="panel" id="history"><div class="sec-head"><h2>Ma consommation</h2>
       <div class="seg" role="tablist" aria-label="Période"><button type="button" data-range="24" class="on" role="tab">24 h</button><button type="button" data-range="168" role="tab">7 jours</button></div></div>
-      <label class="inline">Quota <select id="metric"></select></label>
+      <div id="platform-legend" class="legend" aria-label="Plateformes"></div>
       <p id="history-summary" class="lead small"></p>
       <div class="chart-wrap"><div id="chart" class="chart" tabindex="0" aria-describedby="history-summary"></div><div id="tip" class="tip" role="tooltip" hidden></div></div>
-      <div class="legend"><span><i class="lg-use"></i>Consommation mesurée</span><span><i class="lg-attr"></i>Constatée après une absence de mesure</span><span><i class="lg-lim"></i>Heure avec limite atteinte</span><span><i class="lg-gap"></i>Aucune mesure</span></div>
-      <p class="fine">Chaque barre = la part du quota utilisée pendant l’heure (ou le jour). AI Flow ne mesure que lorsqu’un onglet Claude ou ChatGPT est ouvert : l’usage fait ailleurs (app, téléphone) apparaît au relevé suivant, en hachuré. Survole ou touche une barre pour le détail. Tout reste sur cet appareil.</p>
+      <div class="legend"><span><i class="lg-attr"></i>Constatée après une absence de mesure</span><span><i class="lg-lim"></i>Limite atteinte (point rouge)</span><span><i class="lg-gap"></i>Aucune mesure</span></div>
+      <p class="fine">Chaque couleur représente une plateforme, avec une barre par heure (ou par jour). Une seule référence est utilisée par plateforme : quota 5 h en priorité, sinon hebdomadaire. Les pourcentages ne sont pas additionnés : les capacités des plateformes diffèrent. AI Flow ne mesure que lorsqu’un onglet Claude ou ChatGPT est ouvert : l’usage fait ailleurs (app, téléphone) apparaît au relevé suivant, en couleur atténuée et contour pointillé. Survole ou touche une barre pour le détail. Tout reste sur cet appareil.</p>
     </section>
     <section class="panel"><div class="sec-head"><h2>Continuité</h2><button type="button" class="ghost small" data-open-page="options">Réglages ›</button></div>
       <div id="jobs"></div><div id="awake" class="kv"></div>

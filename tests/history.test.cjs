@@ -41,3 +41,33 @@ test('migration : l’installation d’une nouvelle version ne supprime plus l�
   await new Promise(r=>setTimeout(r,50));
   assert.equal(fb.store.ai_flow_history_v2.series['claude.session'].length,2);
 });
+
+test('vue plateformes : un quota par plateforme, sans additionner session et semaine',()=>{
+  const h={series:{
+    'claude.session':[[NOW-20*MIN,10],[NOW-10*MIN,30]],
+    'claude.weekly':[[NOW-20*MIN,5],[NOW-10*MIN,8]],
+    'codex.session':[[NOW-20*MIN,15],[NOW-10*MIN,25]]
+  }};
+  const before=JSON.stringify(h),s=A.platformConsumption(h,NOW-H,NOW,H);
+  assert.deepEqual(plain(s.map(x=>[x.platform,x.metric,x.bars[0].used])),[
+    ['claude','claude.session',20],['codex','codex.session',10]
+  ]);
+  assert.notEqual(s[0].color,s[1].color);
+  assert.equal(JSON.stringify(h),before,'historique intact');
+});
+test('vue plateformes : repli hebdomadaire stable sur toute la période, absence distincte de zéro',()=>{
+  const h={series:{'claude.session':[[NOW-10*H,80]],'claude.weekly':[[NOW-20*MIN,10],[NOW-10*MIN,10]]}};
+  const s=A.platformConsumption(h,NOW-2*H,NOW,H);
+  assert.equal(s[0].metric,'claude.weekly');
+  assert.equal(s[0].bars[0].measured,0);
+  assert.equal(s[0].bars[1].used,0);
+  assert.equal(s[0].bars[1].measured,2);
+  assert.equal(s[1].metric,null);assert.equal(s[1].bars.every(b=>b.measured===0),true);
+});
+test('vue plateformes : conserve resets et consommation constatée après une absence',()=>{
+  const h={series:{'codex.session':[[NOW-3*H,80],[NOW-2*H,20],[NOW-10*MIN,35]]}};
+  const s=A.platformConsumption(h,NOW-3*H,NOW,H).find(s=>s.platform==='codex');
+  assert.equal(s.bars.reduce((n,b)=>n+b.used,0),35);
+  assert.equal(s.bars.reduce((n,b)=>n+b.attributed,0),35);
+  assert.equal(s.bars.reduce((n,b)=>n+b.resets,0),1);
+});

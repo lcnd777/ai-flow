@@ -1,3 +1,9 @@
+## Non publié — Consommation par plateforme
+
+- Claude et Codex apparaissent ensemble dans « Ma consommation », en barres côte à côte orange et violettes, sur 24 h ou 7 jours.
+- Suppression du sélecteur session / semaine. Une référence unique par plateforme sur toute la période : session en priorité, hebdomadaire si aucun relevé session n’est disponible.
+- Pas d’addition entre quotas ou plateformes. Totaux et couverture par plateforme, légende, détail au survol / toucher / clavier, absence de mesure distinguée de zéro.
+
 ## Non publié — Fiabilité de Smart Context Sync et de la reprise
 
 - Une capture conserve sa révision jusqu’à la préparation : un aperçu périmé ne peut plus remplacer un brouillon récent.

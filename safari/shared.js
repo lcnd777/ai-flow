@@ -308,6 +308,16 @@
     for(const b of out){b.direct=Math.round(b.direct*10)/10;b.attributed=Math.round(b.attributed*10)/10;b.used=Math.round((b.direct+b.attributed)*10)/10;}
     return out;
   }
+  // Une référence par plateforme pour toute la période. Les fenêtres se recouvrent :
+  // ne jamais additionner les pourcentages session / semaine ni changer de base par barre.
+  function platformConsumption(history,from,to,bucket){
+    const series=history?.series||{};
+    return PL.ids().map(id=>{
+      const p=PL.get(id);
+      const metric=p.primary.find(key=>(series[key]||[]).some(pt=>pt[0]>=from&&pt[0]<=to))||null;
+      return {platform:id,name:p.name,color:p.color,metric,bars:consumption(metric?series[metric]:[],from,to,bucket)};
+    });
+  }
   // ---------- Smart Switch : ne recommande que ce qui est réellement connu ----------
   function smartSwitch(state,now=Date.now(),current=null){
     const visible=visiblePlatforms(state).filter(id=>PL.get(id).support!=='none'||PL.get(id).chat);
@@ -531,6 +541,6 @@
 
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
-    runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,smartSwitch,notificationEvents,describeEvents,
+    runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,platformConsumption,smartSwitch,notificationEvents,describeEvents,
     HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,cleanCheckpoints,timelineItems,CONTINUITY_RX:RX,splitSentences:sentences,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

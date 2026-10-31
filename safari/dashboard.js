@@ -1,7 +1,7 @@
 (async function(){
   'use strict';
   const A=window.AIFlow,U=window.AIFlowUI,$=id=>document.getElementById(id),esc=A.escapeHTML;
-  let state,conn={},extras=await U.loadExtras(),awake=null,range=24,metric=null,sel=-1,bars=[],geom=null,flowData={flows:[],quarantined:0};
+  let state,conn={},extras=await U.loadExtras(),awake=null,range=24,series=[],sel=-1,bars=[],geom=null,flowData={flows:[],quarantined:0};
   try{state=await A.getState();}catch(e){$('summary').textContent=e.message;return;}
 
   function summary(){
@@ -19,49 +19,52 @@
   const fmtBucket=(t,b)=>range===24?new Date(t).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'})+' · '+A.clock(t)+' – '+A.clock(t+b)
     :new Date(t).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
   function chart(){
-    const h=extras.history,vis=A.visiblePlatforms(state);
-    const ids=Object.keys(h.series).filter(id=>A.METRICS[id]&&vis.includes(A.METRICS[id].platform));
-    const selEl=$('metric');
-    if(!ids.length){selEl.innerHTML='<option>Aucune mesure pour l’instant</option>';selEl.disabled=true;$('history-summary').textContent='';
-      $('chart').innerHTML='<p class="note">Ta consommation apparaîtra ici après quelques relevés : garde un onglet Claude ou ChatGPT ouvert pendant que tu travailles.</p>';bars=[];geom=null;tip(-1);return;}
-    selEl.disabled=false;
-    if(!metric||!ids.includes(metric))metric=ids.includes('claude.session')?'claude.session':ids[0];
-    selEl.innerHTML=ids.map(id=>`<option value="${id}" ${id===metric?'selected':''}>${esc(A.METRICS[id].label)}</option>`).join('');
-    const now=Date.now(),bucket=range===24?3600000:86400000;
+    const h=extras.history,now=Date.now(),bucket=range===24?3600000:86400000;
     const end=range===24?Math.ceil(now/3600000)*3600000:new Date(new Date(now).setHours(24,0,0,0)).getTime(),from=end-range*3600000;
-    bars=A.consumption(h.series[metric]||[],from,end,bucket);
-    const limits=h.limits.filter(l=>l.id===metric&&(l.to??now)>=from);
-    for(const b of bars)b.limit=limits.some(l=>l.from<b.t+bucket&&(l.to??now)>=b.t);
-    const total=Math.round(bars.reduce((s,b)=>s+b.used,0)),attr=Math.round(bars.reduce((s,b)=>s+b.attributed,0)),measured=bars.filter(b=>b.measured).length;
-    const unit=range===24?'heure':'jour',name=A.METRICS[metric].label;
-    $('history-summary').innerHTML=measured?`<b>${range===24?'Dernières 24 h':'7 derniers jours'} : ${total} % de « ${esc(name)} » consommés</b>${attr?` (dont ${attr} % constatés après une absence de mesure)`:''}. Mesures sur ${measured} ${unit}${measured>1?'s':''} sur ${bars.length}${limits.length?` · limite atteinte ${limits.length} fois`:''}.`:'Aucune mesure sur cette période.';
-    const W=680,H=220,L=44,R=10,T=14,B=28,max=Math.max(5,...bars.map(b=>b.used));
+    series=A.platformConsumption(h,from,end,bucket);
+    bars=series[0]?.bars||[];
+    for(const s of series){
+      const limits=(h.limits||[]).filter(l=>l.id===s.metric&&(l.to??now)>=from);
+      for(const b of s.bars)b.limit=limits.some(l=>l.from<b.t+bucket&&(l.to??now)>=b.t);
+    }
+    $('platform-legend').innerHTML=series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)}${s.metric?'':' · aucune mesure'}</span>`).join('');
+    $('history-summary').innerHTML=series.map(s=>{
+      const measured=s.bars.filter(b=>b.measured).length,total=Math.round(s.bars.reduce((n,b)=>n+b.used,0)*10)/10;
+      return `<span class="consumption-total"><b>${esc(s.name)}</b> ${measured?`${total} % <span class="fine">du quota ${s.metric.endsWith('.session')?'5 h':'hebdomadaire'} · ${measured}/${s.bars.length} ${range===24?'h':'jours'} avec relevés</span>`:'— aucune mesure'}</span>`;
+    }).join('');
+    if(!series.some(s=>s.metric)){
+      $('chart').innerHTML='<p class="note">Ta consommation apparaîtra ici après quelques relevés : garde un onglet Claude ou ChatGPT ouvert pendant que tu travailles.</p>';geom=null;tip(-1);return;
+    }
+    const unit=range===24?'heure':'jour';
+    const W=680,H=220,L=44,R=10,T=14,B=28,max=Math.max(5,...series.flatMap(s=>s.bars.map(b=>b.used)));
     const top=max<=5?5:max<=10?10:max<=25?25:max<=50?50:max<=100?100:Math.ceil(max/50)*50;
     const slot=(W-L-R)/bars.length,y=v=>H-B-(v/top)*(H-B-T);
     geom={W,L,R,slot};
     const grid=[0,top/2,top].map(v=>`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" class="g"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${Math.round(v)} %</text>`).join('');
-    const cols=bars.map((b,i)=>{
-      const x=L+i*slot+slot*.14,w=Math.max(2,slot*.72);
-      if(!b.measured)return `<rect class="nodata" x="${x}" y="${y(0)-3}" width="${w}" height="3"/>`;
-      const hd=Math.max(b.direct>0?1:0,y(0)-y(b.direct)),ha=y(0)-y(b.used)-hd;
-      return `<rect class="use${b.limit?' lim':''}" x="${x}" y="${y(0)-hd}" width="${w}" height="${hd}" rx="2"/>${ha>0.5?`<rect class="attr" x="${x}" y="${y(b.used)}" width="${w}" height="${ha}" rx="2"/>`:''}${b.used===0?`<rect class="zero" x="${x}" y="${y(0)-2}" width="${w}" height="2"/>`:''}`;
-    }).join('');
+    const cols=bars.map((_,i)=>series.map((s,j)=>{
+      const b=s.bars[i],group=slot*.8,sub=group/series.length,x=L+i*slot+slot*.1+j*sub,w=Math.max(1,sub*.8);
+      if(!b.measured)return `<rect class="nodata" x="${x}" y="${y(0)-3}" width="${w}" height="3"><title>${esc(s.name)} : aucune mesure</title></rect>`;
+      const hd=y(0)-y(b.direct),ha=y(0)-y(b.attributed);
+      return `<g class="platform-bars" style="--platform-color:${s.color}"><title>${esc(s.name)} : ${b.used} %</title><rect class="use" x="${x}" y="${y(b.direct)}" width="${w}" height="${hd}" rx="1"/>${ha>0?`<rect class="attr" x="${x}" y="${y(b.used)}" width="${w}" height="${ha}" rx="1"/>`:''}${b.used===0?`<rect class="zero" x="${x}" y="${y(0)-2}" width="${w}" height="2"/>`:''}${b.limit?`<circle cx="${x+w/2}" cy="${y(b.used)-4}" r="2" class="limit-marker"/>`:''}</g>`;
+    }).join('')).join('');
     const every=range===24?3:1;
     const labels=bars.map((b,i)=>i%every===0?`<text x="${L+i*slot+slot/2}" y="${H-8}" text-anchor="middle">${range===24?new Date(b.t).getHours()+' h':new Date(b.t).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'})}</text>`:'').join('');
     const hl=sel>=0&&sel<bars.length?`<rect class="hl" x="${L+sel*slot}" y="${T-6}" width="${slot}" height="${H-B-T+6}"/>`:'';
-    $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Consommation de ${esc(name)} par ${unit}">${hl}${grid}${cols}${labels}</svg>`;
+    $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Consommation par plateforme et par ${unit}, en pourcentage du quota de chaque plateforme">${hl}${grid}${cols}${labels}</svg>`;
     tip(sel);
   }
   function tip(i){
     const el=$('tip');
     if(i<0||i>=bars.length||!geom){el.hidden=true;return;}
-    const b=bars[i],bucket=range===24?3600000:86400000,p=A.METRICS[metric];
-    const lines=[`<b>${esc(fmtBucket(b.t,bucket))}</b>`,`<span class="muted">${esc(p.label)}</span>`];
-    if(!b.measured)lines.push('Aucune mesure : aucun onglet ouvert à ce moment-là.');
-    else{
-      lines.push(`Consommé : <b>${b.used>0?'+':''}${b.used} %</b>${b.attributed?` <span class="muted">(dont +${b.attributed} % constatés au retour, après une absence de mesure)</span>`:''}`);
-      lines.push(`Niveau relevé : ${Math.round(b.first)} %${b.last!==b.first?` → ${Math.round(b.last)} %`:''}${b.lastAt?` <span class="muted">(dernier à ${A.clock(b.lastAt)})</span>`:''}`);
-      lines.push(`<span class="muted">${b.measured} relevé${b.measured>1?'s':''} réel${b.measured>1?'s':''}, lu${b.measured>1?'s':''} sur ${esc(A.platform(p.platform).name==='Codex'?'chatgpt.com':'claude.ai')}${b.resets?` · reset constaté`:''}${b.limit?' · limite atteinte':''}</span>`);
+    const bucket=range===24?3600000:86400000;
+    const lines=[`<b>${esc(fmtBucket(bars[i].t,bucket))}</b>`];
+    for(const s of series){
+      const b=s.bars[i];
+      lines.push(`<span class="tip-platform"><i style="background:${s.color}"></i><b>${esc(s.name)}</b></span>`);
+      if(!b.measured){lines.push('Aucune mesure disponible sur cette tranche.');continue;}
+      lines.push(`Consommé : <b>${b.used} %</b> <span class="muted">(${esc(A.METRICS[s.metric].short)})</span>`);
+      if(b.attributed)lines.push(`<span class="muted">Dont ${b.attributed} % constatés après une absence de mesure.</span>`);
+      lines.push(`<span class="muted">${b.measured} relevé${b.measured>1?'s':''}${b.resets?' · reset constaté':''}${b.limit?' · limite atteinte':''}${b.lastAt?' · dernier à '+A.clock(b.lastAt):''}</span>`);
     }
     el.innerHTML=lines.join('<br>');el.hidden=false;
     const box=$('chart').getBoundingClientRect(),scale=box.width/geom.W;
@@ -85,7 +88,6 @@
     if(e.key==='Escape'){sel=-1;chart();}
   });
   chartEl.addEventListener('blur',()=>{sel=-1;chart();});
-  $('metric').addEventListener('change',e=>{metric=e.target.value;sel=-1;chart();});
   for(const b of document.querySelectorAll('[data-range]'))b.addEventListener('click',()=>{range=Number(b.dataset.range);sel=-1;for(const o of document.querySelectorAll('[data-range]'))o.classList.toggle('on',o===b);chart();});
   function continuity(){
     const jobs=Object.values(extras.jobs).sort((a,b)=>a.at-b.at);

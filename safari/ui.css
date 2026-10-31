@@ -255,3 +255,11 @@ label.switch input:focus-visible+span{outline:2px solid var(--acc);outline-offse
 @media(max-width:620px){.sync-route{grid-template-columns:1fr}.sync-route>span{display:none}.conflict .vs{grid-template-columns:1fr}}
 /* Safari iPhone / iPad : cibles tactiles confortables. */
 @media(pointer:coarse){.sync-item>input{width:24px;height:24px}.choice{padding:10px 12px}#sync-view button,.flow-card button{min-height:44px}}
+
+/* Historique multi-plateformes : couleur stable même quand une limite est atteinte. */
+.chart .platform-bars .use,.chart .platform-bars .zero{fill:var(--platform-color)}
+.chart .platform-bars .attr{fill:var(--platform-color);fill-opacity:.3;stroke:var(--platform-color)}
+.chart .limit-marker{fill:var(--crit)}
+.consumption-total{display:inline-block;margin:8px 22px 0 0}
+.tip-platform{display:inline-block;margin-top:6px}
+.tip-platform i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
