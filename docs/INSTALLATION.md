@@ -1,17 +1,17 @@
-# Installer AI Flow 0.9.0
+# Installer AI Flow 0.10.0
 
 **Pas besoin d’Xcode.** Pour tout utiliser, Safari et le Terminal suffisent. Xcode ne sert qu’à l’installation « app Mac », facultative (voir B).
 
 | | Sans Xcode (recommandé) | Avec Xcode (facultatif) |
 |---|---|---|
 | Quotas, Smart Switch, transfert, historique, relance | ✅ | ✅ |
-| **Awake** (Mac éveillé) | ✅ mode Terminal : une commande à copier | ✅ automatique |
+| **Awake** (relance pendant la nuit) | ✅ rattrapage au réveil, ou réveil programmé (une commande) | ✅ + maintien éveillé automatique |
 | Notifications macOS | bannières dans la pastille | ✅ |
 | Reste installée quand tu quittes Safari | ❌ à rajouter au prochain lancement | ✅ |
 
 ## 0. Décompresser l’archive
 
-Double-clique sur `AI-Flow-v0.9.0-Safari-Mac.zip` dans **Téléchargements** : un dossier apparaît. Il contient un sous-dossier `safari`.
+Double-clique sur `AI-Flow-v0.10.0-Safari-Mac.zip` dans **Téléchargements** : un dossier apparaît. Il contient un sous-dossier `safari`.
 
 ## A. Sans Xcode : extension temporaire dans Safari
 
@@ -25,13 +25,14 @@ Safari retire l’extension temporaire quand tu le quittes : refais l’étape 2
 
 **Le bouton « Ajouter une extension temporaire… » n’existe pas chez toi ?** Il apparaît à partir de Safari 18. Sinon, utilise **Chrome** ou **Edge** (voir plus bas) : tout fonctionne, y compris Awake en mode Terminal.
 
-### Awake sans app Mac (mode Terminal)
-1. AI Flow › **Paramètres** › Continuité : active **Relance après quota** et **Awake**.
-2. Programme une relance depuis la pastille d’une conversation Claude ou ChatGPT.
-3. Clique **Copier la commande Terminal** (dans la pastille ou dans Paramètres). C’est une commande du type `caffeinate -i -t 7800`, déjà calculée pour ta relance.
-4. Ouvre **Terminal** (Applications › Utilitaires), colle avec ⌘V, appuie sur Entrée et **laisse la fenêtre ouverte**.
+### Awake : si une relance tombe pendant que tu dors
+Dans AI Flow › **Paramètres** › Continuité, choisis un des trois modes :
 
-`caffeinate` est un outil fourni par Apple dans macOS : rien à installer. Il empêche la mise en veille automatique jusqu’à 10 min après la relance, puis s’arrête tout seul. Pour arrêter avant, ferme la fenêtre de Terminal. Il ne réveille pas un Mac déjà endormi et n’empêche pas la veille capot fermé sur batterie. Laisse Safari ouvert.
+- **Rattrapage au réveil** (par défaut, aucune action) : si le Mac dort à l’heure prévue, la relance part dès qu’il se réveille, une fois le quota vérifié. Elle est marquée « rattrapée ».
+- **Réveil programmé du Mac** : après avoir programmé une relance, clique **Copier la commande de réveil**, colle-la dans **Terminal** (Applications › Utilitaires), appuie sur Entrée et tape ton mot de passe de session. Il ne s’affiche pas pendant la frappe, c’est normal. Le Mac se réveille 2 min avant la relance, l’envoie et se rendort. Fonctionne branché, ou sur batterie capot ouvert.
+- **Rester éveillé jusqu’à la relance** : pour une absence courte (commande `caffeinate`, ou automatique avec l’app Mac).
+
+Capot fermé sans écran externe, un MacBook se rendort aussitôt : seul le rattrapage au réveil fonctionne alors.
 
 ## B. Facultatif : app Mac avec Xcode (Awake automatique)
 
@@ -57,7 +58,7 @@ Pour mettre à jour plus tard, relance `./prepare-safari.sh`. Il crée un nouvea
 
 ## Chrome / Edge
 
-1. Décompresse `AI-Flow-v0.9.0-Chrome-Edge.zip`.
+1. Décompresse `AI-Flow-v0.10.0-Chrome-Edge.zip`.
 2. Ouvre `chrome://extensions` ou `edge://extensions` et active le **Mode développeur**.
 3. Clique **Charger l'extension non empaquetée** et choisis le dossier `chrome-edge`.
 

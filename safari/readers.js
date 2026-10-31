@@ -132,5 +132,76 @@
     finally{clearTimeout(timer);}
   }
 
-  root.AIFlowReaders={claude,codex};
+
+  /* ---------- Smart Transfer : lecture de LA conversation ouverte, uniquement sur clic explicite ----------
+     Renvoie {status,title,messages:[{role:'user'|'assistant',text}]} ; rien n'est lu en arrière-plan. */
+  async function claudeConversation(){
+    if(location.protocol!=='https:'||location.hostname!=='claude.ai')return {status:'wrong-origin'};
+    const m=location.pathname.match(/^\/chat\/([0-9a-f-]{36})/i);
+    if(!m)return {status:'no-conversation'};
+    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),12000);
+    const clip=t=>String(t||'').replace(/\u0000/g,'').trim();
+    const fromDom=()=>{
+      const nodes=[...document.querySelectorAll('[data-testid="user-message"], .font-claude-response, .font-claude-message')];
+      const top=nodes.filter(n=>!nodes.some(o=>o!==n&&o.contains(n)));
+      const messages=top.map(n=>({role:n.matches('[data-testid="user-message"]')?'user':'assistant',text:clip(n.innerText)})).filter(x=>x.text);
+      return messages.length?{status:'partial',source:'page',title:clip(document.title).replace(/\s*[-–]\s*Claude\s*$/,''),messages}:{status:'no-messages'};
+    };
+    try{
+      const get=async path=>{const r=await fetch('https://claude.ai'+path,{credentials:'include',cache:'no-store',signal:ctrl.signal,headers:{Accept:'application/json','anthropic-client-platform':'web_claude_ai'}});return r.ok?r.json():Promise.reject(r.status);};
+      const orgs=await get('/api/organizations');
+      const list=(Array.isArray(orgs)?orgs:orgs?.organizations||[]).filter(o=>Array.isArray(o?.capabilities)&&o.capabilities.includes('chat'));
+      if(list.length!==1)return fromDom();
+      const c=await get(`/api/organizations/${list[0].uuid}/chat_conversations/${m[1]}?tree=True&rendering_mode=messages&render_all_tools=true`);
+      const raw=Array.isArray(c?.chat_messages)?c.chat_messages:[];
+      const text=x=>clip(typeof x?.text==='string'&&x.text?x.text:Array.isArray(x?.content)?x.content.filter(b=>b?.type==='text'&&typeof b.text==='string').map(b=>b.text).join('\n\n'):'');
+      const messages=raw.slice().sort((a,b)=>(a.index??0)-(b.index??0)).map(x=>({role:x.sender==='human'?'user':x.sender==='assistant'?'assistant':null,text:text(x)})).filter(x=>x.role&&x.text);
+      if(!messages.length)return fromDom();
+      return {status:'ok',source:'api',title:clip(c.name)||clip(document.title),messages};
+    }catch(e){return fromDom();}
+    finally{clearTimeout(timer);}
+  }
+  async function chatgptConversation(){
+    if(location.protocol!=='https:'||location.hostname!=='chatgpt.com')return {status:'wrong-origin'};
+    const m=location.pathname.match(/\/c\/([\w-]+)/);
+    const clip=t=>String(t||'').replace(/\u0000/g,'').trim();
+    const fromDom=()=>{
+      const messages=[...document.querySelectorAll('[data-message-author-role]')].map(n=>({role:n.getAttribute('data-message-author-role'),text:clip(n.innerText)})).filter(x=>(x.role==='user'||x.role==='assistant')&&x.text);
+      return messages.length?{status:'partial',source:'page',title:clip(document.title),messages}:{status:m?'no-messages':'no-conversation'};
+    };
+    if(!m)return fromDom();
+    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),12000);
+    try{
+      const s=await (await fetch('https://chatgpt.com/api/auth/session',{credentials:'include',cache:'no-store',signal:ctrl.signal})).json();
+      const token=typeof s?.accessToken==='string'?s.accessToken:null;
+      if(!token)return fromDom();
+      const r=await fetch('https://chatgpt.com/backend-api/conversation/'+m[1],{credentials:'include',cache:'no-store',signal:ctrl.signal,headers:{Accept:'application/json',Authorization:'Bearer '+token}});
+      if(!r.ok)return fromDom();
+      const c=await r.json(),map=c?.mapping||{};
+      const chain=[];let id=c?.current_node,guard=0;
+      while(id&&map[id]&&guard++<5000){chain.push(map[id]);id=map[id].parent;}
+      const messages=chain.reverse().map(n=>n.message).filter(Boolean).map(x=>{
+        const role=x.author?.role,parts=Array.isArray(x.content?.parts)?x.content.parts.filter(p=>typeof p==='string'):[];
+        return {role,text:clip(parts.join('\n\n')),hidden:x.metadata?.is_visually_hidden_from_conversation};
+      }).filter(x=>(x.role==='user'||x.role==='assistant')&&x.text&&!x.hidden).map(({role,text})=>({role,text}));
+      if(!messages.length)return fromDom();
+      return {status:'ok',source:'api',title:clip(c.title)||clip(document.title),messages};
+    }catch(e){return fromDom();}
+    finally{clearTimeout(timer);}
+  }
+  // Insère un texte dans la zone de saisie SANS l'envoyer (transfert de contexte).
+  async function insertDraft(text){
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    const pick=()=>document.querySelector('#prompt-textarea')||document.querySelector('div.ProseMirror[contenteditable="true"]')||document.querySelector('[data-testid="chat-input"] [contenteditable="true"]')||document.querySelector('fieldset [contenteditable="true"]')||document.querySelector('form textarea');
+    let el=null;for(let i=0;i<40&&!el;i++){el=pick();if(!el)await sleep(250);}
+    if(!el)return {status:'no-composer'};
+    const read=()=>el.tagName==='TEXTAREA'?el.value:el.textContent;
+    if((read()||'').trim())return {status:'draft'};
+    el.focus();
+    if(el.tagName==='TEXTAREA'){Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,text);el.dispatchEvent(new Event('input',{bubbles:true}));}
+    else if(!document.execCommand('insertText',false,text)){el.textContent=text;el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));}
+    await sleep(300);
+    return {status:(read()||'').trim()?'inserted':'not-inserted'};
+  }
+  root.AIFlowReaders={claude,codex,claudeConversation,chatgptConversation,insertDraft};
 })(typeof window!=='undefined'?window:globalThis);

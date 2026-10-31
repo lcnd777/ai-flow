@@ -1,11 +1,11 @@
-# Validation de la 0.9.0
+# Validation de la 0.10.0
 
 ## Tests exécutés
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Unitaires et non-régression (Node 22, sans dépendance) | `npm test` | **39 / 39** |
-| Intégration navigateur : extension Chrome/Edge réelle dans Chromium 1.63 (Playwright), sites **simulés** | `xvfb-run -a node tests/e2e/run.cjs` | **43 / 43** |
+| Unitaires, calculs, migrations, transfert, stockage (Node 22, sans dépendance) | `npm test` | **68 / 68** |
+| Intégration navigateur : extension Chrome/Edge réelle dans Chromium (Playwright), sites **simulés** | `xvfb-run -a node tests/e2e/run.cjs` | **51 / 51** |
 
 ### Ce que couvrent les tests unitaires
 - **Cœur** : nettoyage de l'état (refus des valeurs non observées, hors bornes ou d'une autre plateforme), fraîcheur de 15 min, statuts « non mesuré », « partiel » et « limite atteinte ».
@@ -31,7 +31,7 @@
 - Limite atteinte : la carte de relance s'ouvre, la relance est programmée à la réouverture + 2 min, envoyée une seule fois (vrai `executeScript`) et son résultat est enregistré, puis la notification « de nouveau disponible » arrive.
 - Transfert depuis la pastille avec la sélection, aperçu structuré et modifiable, reprise enregistrée et visible dans le popup.
 
-## Défaut trouvé sur Safari réel (0.8.1) et corrigé en 0.9.0
+## Défaut trouvé sur Safari réel (0.8.1) et corrigé en 0.10.0
 Sans app Mac, Safari ne répond jamais à un appel natif, ce que Chromium ne reproduit pas (l’appel y échoue immédiatement). Un test reproduit désormais ce cas : un appel natif qui ne répond jamais ne doit bloquer ni les réglages ni les ouvertures de pages.
 
 ## Ce qui n'a PAS pu être vérifié ici
@@ -49,3 +49,11 @@ Sans app Mac, Safari ne répond jamais à un appel natif, ce que Chromium ne rep
 2. Dans le popup, les boutons Tableau de bord, Transférer et Paramètres ouvrent chacun un onglet normal.
 3. Paramètres › Awake : active-le, clique « Tester (2 min) ». Une tasse apparaît dans la barre des menus, et `pmset -g assertions` dans le Terminal liste AI Flow.
 4. Programme une relance manuelle dans 2 min depuis une conversation : le message part, puis la tasse redevient une lune.
+
+## Ajouts 0.10.0
+- `tests/runway.test.cjs` : prévisions. Couvre une consommation stable ou irrégulière, l’inactivité, un reset imminent ou passé, une consommation nulle, un historique insuffisant, des relevés périmés, des variations extrêmes, les fuseaux horaires (Paris, New York, Tokyo, en processus séparés), le cas « 14 h à 58 h » et la limite qui bloque en premier.
+- `tests/history.test.cjs` : historique. Couvre l’enregistrement, la détection de reset, la distinction entre mesure directe et attribution, la consommation après un reset, la compatibilité des anciens points et la **migration sans perte**.
+- `tests/transfer.test.cjs` : lecture des conversations Claude et ChatGPT (ordre, rôles, branche courante, repli page), budget du transcript, pré-remplissage, points de reprise, Flow Recovery et refus hors conversation.
+- Intégration : infobulle de l’historique, transfert d’une conversation complète, insertion sans envoi dans ChatGPT, modes Awake et commande `pmset`, seuil d’alerte, Flow Recovery de bout en bout (interruption, réouverture, « Reprendre »).
+
+**Limite du test d’intégration** : un onglet ouvert par l’extension elle-même échappe aux sites simulés. L’insertion automatique est donc vérifiée avec la même fonction sur un onglet ChatGPT simulé déjà ouvert. Sur les vrais sites, les sélecteurs de la zone de saisie restent à confirmer.

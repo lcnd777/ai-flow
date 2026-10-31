@@ -1,3 +1,47 @@
+## 0.10.0 — Continuité du travail : prévisions fiables, historique enrichi, Awake repensé, Smart Transfer 2.0
+
+### Corrigé
+- **Prévisions (AI Runway)** : le moteur extrapolait le rythme de 2 h sur des jours, sommeil compris, puis affichait une fourchette bornée par le reset. D’où le « 14 h à 58 h ». Le nouveau moteur :
+  - **session (5 h)** : rythme récent seulement s’il y a assez de relevés (≥ 3 sur 20 min) et une activité récente. La fiabilité vient de la cohérence entre les deux moitiés de l’observation.
+  - **semaine** : rythme moyen depuis le début de la période (nuits et pauses comprises), comparé au temps écoulé.
+  - **issues explicites** : limite atteinte, reset imminent, historique insuffisant, aucune consommation récente, pas de limite avant la réinitialisation (avec marge), risque avant le reset (heure et confiance) ou risque non chiffré (prévision peu fiable). Jamais de fourchette en heures.
+  - **popup et pastille** : n’affichent une prévision que si elle est utile.
+- **Historique** : restauré (la 0.9.0 le supprimait à l’installation, ce qui n’arrive plus). Améliorations :
+  - les hausses constatées après une absence de mesure sont distinguées (hachuré) ;
+  - la consommation qui suit un reset est comptée ;
+  - les axes sont plus lisibles ;
+  - **infobulle** au survol, au toucher et au clavier : heure, quota, consommation, niveau relevé, nombre de relevés réels, reset, limite.
+- **Awake** repensé autour du vrai besoin (une relance qui tombe la nuit) :
+  - rattrapage au réveil par défaut, sans aucune action ;
+  - réveil programmé du Mac (`pmset`, 2 min avant, puis il se rendort) ;
+  - maintien éveillé pour une absence courte ;
+  - FAQ (branché, batterie, capot fermé, relance manquée). Une relance manquée part au réveil et est signalée « rattrapée ».
+
+### Nouveau
+- **Smart Transfer 2.0** : « Transférer cette conversation » (fenêtre AI Flow ou pastille) lit **sur ton clic** la conversation Claude ou ChatGPT ouverte, dans l’ordre et par rôle. La page prépare ensuite un message de reprise :
+  - objectif et prochaines actions pré-remplis, plus les derniers échanges, ou la conversation complète ;
+  - taille choisie, aperçu modifiable ;
+  - ouverture de la destination avec **insertion dans la zone de saisie sans envoi** (copie en secours).
+- **Flow Checkpoints** : points de reprise (nom, plateforme, lien, objectif, décisions, prochaines étapes, message) à créer, modifier et supprimer. Les reprises de la 0.8 sont conservées.
+- **Flow Recovery** : quand une limite interrompt une conversation, AI Flow en note le titre et le lien (sans contenu). Quand le quota est confirmé rouvert, la notification et la fenêtre proposent **« Reprendre »**.
+- **Flow Timeline** (tableau de bord) : ce que tu faisais, où, sur quelle IA, et comment continuer.
+- **Quota Intelligence** : la limite qui bloquera en premier (temps et rythme, pas seulement le %).
+- **AI Availability Radar** : Disponible, Proche de la limite, Limite atteinte, Reset imminent, Données périmées, Indisponible.
+- **Alertes personnalisables** : seuil 70, 80, 90, 95 % ou valeur libre, chaque type désactivable, sans répétition.
+- **Fenêtre AI Flow** : l’IA de l’onglet actif en premier (« Tu utilises Claude »), avec ses actions de transfert et de point de reprise.
+
+### Expérimental / à valider sur Safari réel
+- Lecture des conversations (API web internes de Claude et ChatGPT, repli sur la page affichée).
+- Insertion automatique dans la zone de saisie.
+- Réveil programmé `pmset`.
+- Rattrapage après la veille dans Safari.
+
+### Non réalisé (limites réelles)
+- **Barre de menus macOS native, raccourci global, widget macOS** : nécessitent une app compilée avec Xcode, indisponible sur ton Mac et ici (Linux). Le code Swift existant (Awake, menu) est conservé dans `native/`.
+- Multi-comptes simultanés : les relevés restent isolés par compte (changement de compte = relevés effacés), sans vue côte à côte.
+- Context Health, dépenses et crédits, statut des services : étudiés, non intégrés (voir docs/QUOTAS.md).
+- Nouvelles plateformes : aucune n’expose de quota fiable (Gemini, Cursor, Copilot, Perplexity, Grok).
+
 ## 0.9.0 — Plus simple : Claude et Codex, relance automatique pour Codex, Awake expliqué
 
 - **Grok retiré** (lecture expérimentale non vérifiable). AI Flow suit désormais Claude et Codex uniquement.

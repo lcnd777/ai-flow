@@ -44,27 +44,44 @@
     try{await A.saveSettings(patch);state=await A.getState();render();notice('Réglage enregistré.');}
     catch(e){notice(e.message);render();}
   }
+  function threshold(){
+    const v=state.settings.alertThreshold,preset=['70','80','90','95'].includes(String(v));
+    $('threshold').value=preset?String(v):'custom';$('threshold-custom').hidden=preset;$('threshold-custom').value=v;
+  }
+  $('threshold').onchange=async()=>{
+    if($('threshold').value==='custom'){$('threshold-custom').hidden=false;$('threshold-custom').focus();return;}
+    await set({alertThreshold:Number($('threshold').value)});
+  };
+  $('threshold-custom').onchange=async()=>{const n=Number($('threshold-custom').value);if(n>=50&&n<=99)await set({alertThreshold:n});else notice('Choisis une valeur entre 50 et 99 %.');};
   function render(){
-    platforms();
+    platforms();threshold();
     for(const input of document.querySelectorAll('[data-setting]'))input.checked=!!state.settings[input.dataset.setting];
   }
   for(const input of document.querySelectorAll('[data-setting]'))input.addEventListener('change',async()=>{
     await set({[input.dataset.setting]:input.checked});
-    if(input.dataset.setting==='awakeEnabled')awake();
   });
   async function awake(){
+    for(const r of document.querySelectorAll('input[name="awakeMode"]'))r.checked=r.value===state.settings.awakeMode;
     $('awake-state').textContent='Vérification…';$('awake-state').className='muted';
-    try{const s=await A.request('awakeStatus'),t=U.awakeText(s);$('awake-state').textContent=t.text;$('awake-state').className=t.cls;
-      const terminal=s.enabled&&U.isMac()&&(s.supported===false||!s.reachable)&&s.error!=='unsupported-platform';
-      $('awake-test').hidden=terminal;$('awake-test').disabled=!s.enabled||s.supported===false;
-      $('awake-terminal').hidden=!terminal;
-      if(terminal){
-        const cmd=A.caffeinateCommand(s.until);
-        $('awake-cmd').textContent=cmd||'caffeinate -i -t 7200';
-        $('awake-cmd-note').textContent=cmd?`Calculée pour ta prochaine relance : Mac éveillé jusqu’à ${A.dayClock(s.until)}.`:(s.tooFar?'Ta relance est prévue dans plus de 12 h : programme-la plus près ou adapte la durée (en secondes).':'Aucune relance programmée : voici un exemple pour 2 heures. La commande exacte apparaîtra ici après avoir programmé une relance.');
-      }}
-    catch(e){$('awake-state').textContent=e.message;}
+    try{
+      const s=await A.request('awakeStatus'),t=U.awakeText(s);$('awake-state').textContent=t.text;$('awake-state').className=t.cls;
+      const nativeOk=s.mode==='stay'&&s.supported!==false&&s.reachable;
+      $('awake-test').hidden=!nativeOk;
+      let cmd='',why='',note='';
+      if(s.mode==='wake'&&U.isMac()){
+        why='Colle cette commande dans Terminal (Applications › Utilitaires), appuie sur Entrée, puis tape ton mot de passe de session (il ne s’affiche pas pendant la frappe, c’est normal). macOS confirme sans message : le réveil est programmé.';
+        if(s.nextAt){cmd=A.pmsetCommand(s.nextAt-2*60000);note=`Réveil à ${A.dayClock(s.nextAt-2*60000)}, 2 min avant ta prochaine relance (${A.dayClock(s.nextAt)}). À refaire pour chaque nouvelle relance.`;}
+        else note='Aucune relance programmée : la commande apparaîtra ici (et dans la pastille) dès que tu en programmes une.';
+      }else if(s.mode==='stay'&&U.isMac()&&!nativeOk){
+        why='Colle cette commande dans Terminal et appuie sur Entrée. Rien ne s’affiche : c’est normal, elle attend. Laisse la fenêtre ouverte ; elle s’arrête seule. Pour arrêter plus tôt, ferme la fenêtre.';
+        if(s.until>Date.now()){cmd=A.caffeinateCommand(s.until);note=`Mac éveillé jusqu’à ${A.dayClock(s.until)}.`;}
+        else note=s.tooFar?'Ta relance est prévue dans plus de 12 h : préfère le « Réveil programmé ».':'Aucune relance programmée : la commande apparaîtra ici dès que tu en programmes une.';
+      }
+      $('awake-terminal').hidden=!(why);
+      $('awake-why').textContent=why;$('awake-cmd').textContent=cmd;$('awake-cmd').hidden=!cmd;$('awake-copy').hidden=!cmd;$('awake-cmd-note').textContent=note;
+    }catch(e){$('awake-state').textContent=e.message;}
   }
+  for(const r of document.querySelectorAll('input[name="awakeMode"]'))r.addEventListener('change',async()=>{if(r.checked){await set({awakeMode:r.value});awake();}});
   $('awake-refresh').onclick=awake;
   $('awake-copy').onclick=async()=>{
     try{await navigator.clipboard.writeText($('awake-cmd').textContent);notice('Commande copiée : colle-la dans Terminal (⌘V) puis Entrée.');}
@@ -77,6 +94,12 @@
     catch(e){notice(e.message);await awake();}
     finally{b.disabled=false;}
   };
+  $('export').onclick=async()=>{
+    const {history}=await U.loadExtras();
+    const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),note:'Mesures réelles uniquement : [horodatage ms, % utilisé, reset annoncé ms]. Les trous = aucun relevé.',history},null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='AI-Flow-historique.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+  };
+  $('clear-history').onclick=async()=>{if(!confirm('Effacer l’historique de consommation ?'))return;try{await A.request('clearHistory');notice('Historique effacé.');}catch(e){notice(e.message);}};
   $('clear').onclick=async()=>{if(!confirm('Supprimer tous les relevés, l’historique et les diagnostics ?'))return;try{await A.request('clear');state=await A.getState();render();notice('Relevés supprimés. Ils reviendront à la prochaine lecture d’un onglet ouvert.');}catch(e){notice(e.message);}};
   async function reload(){try{state=await A.getState();}catch{}auto=(await U.loadExtras()).auto;try{conn=await A.request('connectionStatuses');}catch{}render();}
   U.bindNav(document);render();await reload();awake();

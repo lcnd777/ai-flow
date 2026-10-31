@@ -16,7 +16,9 @@
     </section>
 
     <section class="panel"><h2>Notifications</h2>
-      <div class="setting"><div><b>Limite proche</b><span>Une fois par période, quand un quota mesuré atteint 90 %.</span></div><label class="switch"><input type="checkbox" data-setting="notifyApproaching"><span></span></label></div>
+      <div class="setting"><div><b>Limite proche</b><span>Une seule fois par période de quota, au seuil choisi.</span></div><label class="switch"><input type="checkbox" data-setting="notifyApproaching"><span></span></label></div>
+      <div class="setting"><div><b>Seuil d’alerte</b><span>Pourcentage utilisé à partir duquel AI Flow te prévient.</span></div>
+        <div class="threshold"><select id="threshold" aria-label="Seuil d’alerte"><option value="70">70 %</option><option value="80">80 %</option><option value="90">90 %</option><option value="95">95 %</option><option value="custom">Autre…</option></select><input id="threshold-custom" type="number" min="50" max="99" step="1" aria-label="Seuil personnalisé" hidden></div></div>
       <div class="setting"><div><b>Limite atteinte</b><span>Avec l’heure de réouverture quand elle est connue.</span></div><label class="switch"><input type="checkbox" data-setting="notifyReached"><span></span></label></div>
       <div class="setting"><div><b>Quota de nouveau disponible</b><span>Uniquement après un nouveau relevé qui confirme le reset.</span></div><label class="switch"><input type="checkbox" data-setting="notifyReset"><span></span></label></div>
       <div class="setting"><div><b id="sys-title">Notifications du système</b><span id="sys-desc">En plus de la bannière discrète dans la pastille AI Flow.</span></div><label class="switch"><input type="checkbox" data-setting="systemNotifications"><span></span></label></div>
@@ -29,30 +31,34 @@
 
     <section class="panel"><h2>Continuité</h2>
       <div class="setting"><div><b>Relance après quota</b><span>Quand Claude (dans une conversation) ou Codex (dans une tâche sur chatgpt.com/codex) atteint sa limite, la pastille propose de relancer à la réouverture, en un clic. Dans une conversation ChatGPT classique, dont les limites ne sont pas lisibles, tu choisis l’heure. Un seul envoi, annulable.</span></div><label class="switch"><input type="checkbox" data-setting="resumePrompt"><span></span></label></div>
-      <div class="setting"><div><b>Awake : garder le Mac éveillé</b><span>Pour que la relance programmée parte même si tu t’absentes : sans ça, le Mac se met en veille et la relance est manquée.</span></div><label class="switch"><input type="checkbox" data-setting="awakeEnabled"><span></span></label></div>
+      <h3>Awake · si une relance tombe pendant que tu dors</h3>
+      <p class="fine">Une relance ne peut partir que si le Mac est allumé et Safari ouvert. Choisis ce qu’AI Flow fait quand ce n’est pas le cas.</p>
+      <div class="modes" role="radiogroup" aria-label="Mode Awake">
+        <label class="mode"><input type="radio" name="awakeMode" value="catchup"><div><b>Rattrapage au réveil</b> <span class="tag live">recommandé · aucune action</span><span>Si le Mac dort à l’heure prévue, la relance part dès qu’il se réveille (Safari ouvert). Rien à installer, aucune commande.</span></div></label>
+        <label class="mode"><input type="radio" name="awakeMode" value="wake"><div><b>Réveil programmé du Mac</b><span>Le Mac se réveille 2 min avant la relance, l’envoie, puis se rendort de lui-même. Il ne reste pas éveillé toute la nuit. Une commande à coller une fois par relance, avec ton mot de passe administrateur (macOS l’exige pour programmer un réveil).</span></div></label>
+        <label class="mode"><input type="radio" name="awakeMode" value="stay"><div><b>Rester éveillé jusqu’à la relance</b><span>Empêche la mise en veille jusqu’à 10 min après la relance. Utile pour une absence courte. Avec l’app Mac (Xcode), c’est automatique ; sinon une commande à coller.</span></div></label>
+      </div>
       <div class="kv"><span>État</span><b id="awake-state" class="muted">Vérification…</b></div>
       <div id="awake-terminal" class="terminal" hidden>
-        <p class="fine"><b>Pourquoi ?</b> Une relance programmée ne part que si ton Mac est allumé et Safari ouvert. Si tu t’absentes, le Mac se met en veille au bout de quelques minutes : Safari s’arrête et la relance est manquée.</p>
-        <p class="fine"><b>Que fait la commande ?</b> Elle demande à macOS de ne pas se mettre en veille pendant le temps indiqué (en secondes), jusqu’à 10 min après ta relance. L’écran peut s’éteindre, ce n’est pas grave.</p>
-        <p class="fine"><b>Comment ?</b> 1. Copier. 2. Ouvrir Terminal (Applications › Utilitaires). 3. Coller (⌘V) puis Entrée. <b>Il ne se passe rien à l’écran : c’est normal</b>, la commande attend. Laisse la fenêtre ouverte. À l’heure prévue, elle se termine seule et ton Mac reprend son comportement habituel. Pour arrêter plus tôt : ferme la fenêtre.</p>
-        <p class="fine">Inutile si ton Mac ne se met jamais en veille tout seul (par exemple branché sur secteur avec la veille désactivée dans Réglages Système).</p>
+        <p class="fine" id="awake-why"></p>
         <div class="cmd"><code id="awake-cmd"></code><button type="button" id="awake-copy" class="primary small">Copier</button></div>
         <p class="fine" id="awake-cmd-note"></p>
       </div>
-      <div class="row-actions"><button type="button" id="awake-test" class="ghost small">Tester (2 min)</button><button type="button" id="awake-refresh" class="ghost small">Revérifier</button></div>
-      <details class="explain"><summary>Ce qu’Awake peut et ne peut pas faire</summary>
-        <ul>
-          <li>Awake empêche la <b>mise en veille automatique</b> (inactivité). L’écran peut s’éteindre et la session se verrouiller : la relance fonctionne quand même si Safari reste ouvert.</li>
-          <li>Il <b>ne réveille pas</b> un Mac déjà endormi et n’empêche pas la veille quand tu fermes le capot sur batterie, ni une mise en veille manuelle.</li>
-          <li>Deux façons de l’utiliser sur Mac : le <b>mode Terminal</b> (aucune installation : une commande à copier, fonctionne aussi avec Chrome et Edge sur Mac), ou l’<b>app AI Flow</b> (automatique, nécessite Xcode via <code>prepare-safari.sh</code>).</li>
-          <li>Pour la batterie : seul le Mac reste éveillé, pas l’écran ; limité aux relances prévues dans les 12 h ; mis en pause sous 20 % de batterie hors secteur.</li>
-          <li>Indisponible sur iPhone, iPad et Windows.</li>
-        </ul></details>
+      <div class="row-actions"><button type="button" id="awake-test" class="ghost small" hidden>Tester l’app Mac (2 min)</button><button type="button" id="awake-refresh" class="ghost small">Revérifier</button></div>
+      <details class="explain"><summary>Questions fréquentes</summary>
+        <dl class="faq">
+          <dt>À quoi sert Awake ?</dt><dd>À ne pas perdre une relance programmée (par exemple quand ta session Claude se réinitialise à 3 h du matin) parce que ton Mac dormait.</dd>
+          <dt>Que se passe-t-il si le Mac dort ?</dt><dd>Safari est en pause : rien ne peut partir. En mode « Rattrapage », la relance part au réveil et est marquée « rattrapée ». En mode « Réveil programmé », macOS réveille le Mac juste avant.</dd>
+          <dt>Le Mac doit-il être branché ?</dt><dd>Recommandé pour le réveil programmé. Sur batterie, le réveil fonctionne capot ouvert ; macOS peut l’ignorer si la batterie est très faible.</dd>
+          <dt>Et capot fermé ?</dt><dd>Un MacBook capot fermé sans écran externe se rendort aussitôt : ni le réveil programmé ni le maintien éveillé ne peuvent garantir l’envoi. Le rattrapage au réveil, lui, fonctionne toujours.</dd>
+          <dt>Si la relance est manquée ?</dt><dd>Elle n’est jamais perdue : elle part dès que le Mac et Safari sont de nouveau disponibles, après avoir vérifié que le quota est bien rouvert. Sinon, AI Flow réessaie (12 fois maximum).</dd>
+          <dt>Pourquoi une commande Terminal ?</dt><dd>Une extension de navigateur n’a pas le droit de réveiller l’ordinateur. Seul l’outil Apple <code>pmset</code> (ou l’app AI Flow compilée avec Xcode) le peut.</dd>
+        </dl></details>
     </section>
 
     <section class="panel"><h2>Données et confidentialité</h2>
-      <p class="fine">AI Flow enregistre localement des pourcentages, des dates de reset, tes reprises et tes réglages. Aucun mot de passe, cookie, jeton de session ni contenu de conversation n’est enregistré. Rien n’est envoyé à un serveur AI Flow : il n’y en a pas. Les lectures passent par ta session dans l’onglet officiel de chaque plateforme. Les lecteurs Claude et Codex utilisent des interfaces web internes non documentées : elles peuvent changer sans préavis. AI Flow affiche alors « Indisponible ».</p>
-      <div class="row-actions"><button type="button" id="clear" class="danger small">Supprimer tous les relevés</button></div>
+      <p class="fine">AI Flow enregistre localement des pourcentages, des dates de reset, l’historique de consommation des 7 derniers jours, tes points de reprise et tes réglages. Aucun mot de passe, cookie ni jeton de session n’est enregistré. Le contenu d’une conversation n’est lu que sur ton clic (« Transférer », « Point de reprise ») et n’est conservé que si tu enregistres un point de reprise ; tu peux le supprimer à tout moment depuis le tableau de bord. Rien n’est envoyé à un serveur AI Flow : il n’y en a pas. Les lectures passent par ta session dans l’onglet officiel de chaque plateforme. Les lecteurs Claude et Codex utilisent des interfaces web internes non documentées : elles peuvent changer sans préavis. AI Flow affiche alors « Indisponible ».</p>
+      <div class="row-actions"><button type="button" id="export" class="ghost small">Exporter l’historique (JSON)</button><button type="button" id="clear-history" class="ghost small">Effacer l’historique</button><button type="button" id="clear" class="danger small">Supprimer tous les relevés</button></div>
       <p id="notice" class="fine" role="status"></p>
     </section>
     <p class="fine center" id="version"></p>

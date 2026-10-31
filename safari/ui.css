@@ -60,6 +60,7 @@ button:disabled{opacity:.45;cursor:default}
 .bar.warning{background:var(--warn)}.bar.critical{background:var(--crit)}
 .meter-meta{display:flex;justify-content:space-between;gap:8px;margin-top:4px;font-size:10.5px;color:var(--mut)}
 .estimate{margin:10px 0 0;font-size:11.5px;color:var(--ink2);background:var(--panel2);border-radius:9px;padding:7px 9px}
+.estimate.risky{background:color-mix(in srgb,var(--warn) 13%,var(--panel2));color:var(--ink)}
 .estimate em{font-style:normal;font-size:10px;color:var(--mut);border:1px solid var(--edge2);border-radius:4px;padding:0 4px;margin-left:4px}
 .note{margin:0;color:var(--mut);font-size:11.5px}
 .conn{font-size:11px;color:var(--mut)}
@@ -104,6 +105,15 @@ body.popup{width:380px;max-height:600px;display:flex;flex-direction:column;backg
 .pop-nav button{background:var(--panel);border:1px solid var(--edge);border-radius:9px;padding:8px 4px;font-size:11.5px;font-weight:600;color:var(--ink2)}
 .pop-nav button:hover{border-color:var(--acc);color:var(--ink)}
 
+.nowbar{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border-radius:var(--radius);background:color-mix(in srgb,var(--acc) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--acc) 28%,var(--edge))}
+.nowbar>div{min-width:0}.nowbar b{display:block;font-size:12.5px}.nowbar small{display:block;color:var(--ink2);font-size:11px}
+.now-actions{display:grid;grid-template-columns:1fr auto;gap:6px;margin:0 0 10px}
+.cline.ready b{color:var(--ok)}.cline.done{opacity:.55}
+.timeline .cline button{margin-left:4px}
+.source-card .fine{margin-top:0}
+.inline-modes{grid-template-columns:1fr 1fr}
+@media(max-width:700px){.inline-modes{grid-template-columns:1fr}}
+
 /* ---------- Pages pleine taille ---------- */
 body.page{min-height:100vh;background:radial-gradient(1200px 500px at 85% -10%,color-mix(in srgb,var(--acc) 9%,transparent),transparent 60%),var(--bg)}
 .page-top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px max(16px,calc((100vw - 1120px)/2));background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--edge)}
@@ -121,7 +131,7 @@ body.page{min-height:100vh;background:radial-gradient(1200px 500px at 85% -10%,c
 .seg button.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.15)}
 label{display:block;color:var(--ink2);font-size:12px;font-weight:600;margin:12px 0 0}
 label.inline{display:flex;align-items:center;gap:8px;margin:0 0 8px}
-input:not([type=checkbox]),select,textarea{display:block;width:100%;margin-top:5px;background:var(--bg2);border:1px solid var(--edge2);border-radius:9px;padding:9px 10px;font-weight:400;outline:none}
+input:not([type=checkbox]):not([type=radio]),select,textarea{display:block;width:100%;margin-top:5px;background:var(--bg2);border:1px solid var(--edge2);border-radius:9px;padding:9px 10px;font-weight:400;outline:none}
 label.inline select{width:auto;margin:0}
 textarea{resize:vertical;line-height:1.45}
 input:focus,select:focus,textarea:focus{border-color:var(--acc)}
@@ -140,6 +150,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 .chart .use{fill:var(--acc)}.chart .use.lim{fill:var(--crit)}
 .chart .nodata{fill:var(--edge2)}
 .lead.small{font-size:13px;margin:4px 0 10px}
+.chart-wrap{position:relative}
+.chart{outline:none;touch-action:pan-y}.chart:focus-visible{outline:2px solid var(--acc);outline-offset:4px;border-radius:8px}
+.chart .attr{fill:color-mix(in srgb,var(--acc) 35%,transparent);stroke:var(--acc);stroke-width:.8;stroke-dasharray:2 2}
+.chart .zero{fill:var(--acc);opacity:.35}
+.chart .hl{fill:var(--panel2)}
+.tip{position:absolute;top:6px;max-width:280px;padding:9px 11px;border-radius:10px;background:var(--panel);border:1px solid var(--edge2);box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:12px;line-height:1.5;pointer-events:none;z-index:3}
+.tip .muted{color:var(--mut)}
+.lg-use{background:var(--acc)}.lg-attr{background:color-mix(in srgb,var(--acc) 35%,transparent);outline:1px dashed var(--acc)}.lg-lim{background:var(--crit)}
 .chart polyline{fill:none;stroke:var(--acc);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 .chart .pt{fill:var(--acc)}
 .chart .lim{fill:color-mix(in srgb,var(--crit) 22%,transparent)}
@@ -180,6 +198,13 @@ label.switch input:focus-visible+span{outline:2px solid var(--acc);outline-offse
 .terminal .fine{margin:0 0 8px}
 .cmd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .cmd code{flex:1;min-width:0;font-size:13px;padding:8px 10px;background:var(--bg2);border:1px solid var(--edge2);border-radius:8px;overflow-x:auto;white-space:nowrap}
+.threshold{display:flex;gap:6px;align-items:center}.threshold select,.threshold input{width:auto;margin:0}.threshold input{width:76px}
+.modes{display:grid;gap:8px;margin:10px 0}
+.mode{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1px solid var(--edge);border-radius:11px;margin:0;cursor:pointer;font-weight:500}
+.mode:has(input:checked){border-color:var(--acc);background:color-mix(in srgb,var(--acc) 7%,var(--panel))}
+.mode input{margin-top:3px;accent-color:var(--acc)}
+.mode b{font-size:13px;color:var(--ink)}.mode span:not(.tag){display:block;color:var(--mut);font-size:11.5px;margin-top:2px;font-weight:400}
+.faq dt{font-weight:600;margin-top:10px}.faq dd{margin:2px 0 0;color:var(--mut)}
 .explain{margin-top:10px;font-size:12px;color:var(--ink2)}
 .explain summary{cursor:pointer;color:var(--acc);font-weight:600}
 .explain ul{margin:8px 0 0;padding-left:18px}.explain li{margin:4px 0}

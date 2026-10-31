@@ -25,3 +25,10 @@ Chaque plateforme est décrite dans `safari/platforms.js` : hôtes, limites, niv
 ## Fragilité et risques des méthodes non officielles
 
 Les lecteurs Claude et Codex utilisent des endpoints internes, sans documentation ni engagement de stabilité. Un changement côté plateforme les fait passer en « Indisponible : réponse non reconnue », jamais à une fausse valeur. Ils n'effectuent que des lectures, au plus une fois par minute et par plateforme, seulement si un onglet est déjà ouvert. Les conditions d'utilisation d'Anthropic et OpenAI encadrent l'accès automatisé à leurs services : cette lecture reste à l'initiative et sous la responsabilité de l'utilisateur. La relance automatique (envoi d'un message) est plus sensible encore. Elle est désactivée par défaut, armée explicitement, n'envoie qu'une seule fois et reste annulable.
+
+## Études 0.10.0 (non intégrées, et pourquoi)
+
+- **Grok** : endpoint interne `rest/rate-limits` non vérifiable sur compte réel depuis l’environnement de développement. Retiré en 0.9.0 et non réintégré.
+- **Statut des services** : les pages de statut Anthropic (status.anthropic.com) et OpenAI exposent un état public. L’intégrer distinguerait une panne fournisseur d’un problème de connecteur, mais demanderait de nouvelles permissions d’hôte, et le format OpenAI a changé en 2025. Reporté.
+- **Multi-comptes** : un changement de compte efface déjà les relevés de l’ancien compte (jamais de mélange). Une vue côte à côte demanderait de stocker par compte un identifiant. Reporté.
+- **Context Health** : la longueur visible d’une conversation ne reflète pas la fenêtre de contexte réelle du modèle. Non intégré pour ne pas afficher d’indicateur trompeur.

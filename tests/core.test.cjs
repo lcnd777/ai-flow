@@ -37,26 +37,6 @@ test('platformStatus : non mesuré, partiel, limite atteinte',()=>{
   const p=A.platformStatus(st({'codex.weekly':obs(20)}),'codex',NOW);
   assert.equal(p.partial,true);assert.equal(p.level,'healthy');
 });
-function withHistory(points,resetIn=4*H){
-  const s=st({'claude.session':obs(points.at(-1)[1],points.at(-1)[0],resetIn)});
-  s.history['claude.session']=points.map(([ago,p])=>({ts:NOW-ago,percent:p,resetAt:NOW+resetIn}));
-  return s;
-}
-test('autonomie : rien sans données suffisantes',()=>{
-  assert.equal(A.autonomy(withHistory([[10*MIN,20],[0,22]]),'claude.session',NOW),null);
-  assert.equal(A.autonomy(withHistory([[6*MIN,20],[3*MIN,21],[0,22]]),'claude.session',NOW),null,'moins de 15 min');
-});
-test('autonomie : estimation avec fourchette au rythme régulier',()=>{
-  const s=withHistory([[30*MIN,40],[20*MIN,45],[10*MIN,50],[0,55]]); // 30 %/h → 45 % restants ≈ 90 min
-  const a=A.autonomy(s,'claude.session',NOW);
-  assert.ok(a&&!a.beyondReset);assert.equal(a.minutes,90);assert.ok(a.low<=90&&a.high>=90);
-  assert.match(A.autonomyText(a),/limite possible dans ~1 h 30/);
-});
-test('autonomie : au-delà du reset → message dédié, sans durée',()=>{
-  const s=withHistory([[30*MIN,10],[20*MIN,11],[10*MIN,12],[0,13]],30*MIN);
-  const a=A.autonomy(s,'claude.session',NOW);
-  assert.equal(a.beyondReset,true);assert.match(A.autonomyText(a),/avant le reset/);
-});
 test('Smart Switch : ne recommande que des capacités connues',()=>{
   const s=st({'claude.session':obs(92),'claude.weekly':obs(40,MIN,3*24*H),'codex.session':obs(10),'codex.weekly':obs(30,MIN,5*24*H),'grok.queries':obs(50,40*MIN)});
   const sw=A.smartSwitch(s,NOW);

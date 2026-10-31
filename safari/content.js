@@ -92,9 +92,11 @@
     return {time:presetAt?hhmm(presetAt):'',presetAt,text:form.text||DEFAULT_TEXT,keepAwake:true,error:''};
   }
   function awakeLine(job){
-    if(!job.keepAwake||!state.settings.awakeEnabled)return '';
-    if(job.at-Date.now()>12*3600000)return ' · Mac éveillé : relance > 12 h, non maintenu';
-    if(terminalMode(job))return ' · Mac éveillé : lance la commande Terminal ci-dessous';
+    const mode=state.settings.awakeMode;
+    if(mode==='catchup'||!isMac)return ' · si le Mac dort, elle partira à son réveil';
+    if(mode==='wake')return ' · réveil programmé : colle la commande ci-dessous';
+    if(job.at-Date.now()>12*3600000)return ' · relance > 12 h : rattrapage au réveil';
+    if(terminalMode(job))return ' · Mac éveillé : lance la commande ci-dessous';
     const a=armedInfo&&armedInfo.id===job.id?armedInfo.awake:null;
     if(a&&a.appRunning===false)return ' · Mac éveillé : app AI Flow non lancée';
     return ' · Mac maintenu éveillé';
@@ -102,26 +104,26 @@
   const isMac=/Mac/i.test(navigator.platform||navigator.userAgent)&&!(navigator.maxTouchPoints>1);
   function terminalMode(job){
     const a=armedInfo&&armedInfo.id===job.id?armedInfo.awake:awakeInfo;
-    return isMac&&job.keepAwake&&state.settings.awakeEnabled&&job.at-Date.now()<=12*3600000&&(a?.supported===false||a?.reachable===false);
+    return isMac&&state.settings.awakeMode==='stay'&&job.at-Date.now()<=12*3600000&&(a?.supported===false||a?.reachable===false);
   }
   function resumeSection(){
     if(!canResume||(!state.settings.resumePrompt&&!currentJob()))return '';
     if(!formOpen&&limitPrompt())return '';
     if(!conv())return `<div class="resume tiny">Relance après quota : ouvre une conversation pour la programmer.</div>`;
     const job=currentJob();
-    if(job)return `<div class="resume"><div class="row"><span>Relance prévue <b>${esc(A.dayClock(job.at))}</b></span><button id="resume-cancel" class="link" data-id="${esc(job.id)}">Annuler</button></div><div class="tiny">« ${esc(job.message.slice(0,80))}${job.message.length>80?'…':''} »${esc(awakeLine(job))}${job.attempts?` · nouvel essai (${esc(job.status)})`:''}</div>${terminalMode(job)?`<div class="acts"><button id="awake-copy" class="btn" data-cmd="${esc(A.caffeinateCommand(job.at+A.AWAKE_GRACE))}">Copier la commande Terminal</button></div><div class="tiny" id="awake-copied">Sans ça, ton Mac peut se mettre en veille avant ${esc(hhmm(job.at))} et la relance serait manquée. Colle la commande dans Terminal (⌘V, Entrée) : rien ne s’affiche, c’est normal. Laisse la fenêtre ouverte, elle s’arrête toute seule.</div>`:''}</div>`;
+    if(job)return `<div class="resume"><div class="row"><span>Relance prévue <b>${esc(A.dayClock(job.at))}</b></span><button id="resume-cancel" class="link" data-id="${esc(job.id)}">Annuler</button></div><div class="tiny">« ${esc(job.message.slice(0,80))}${job.message.length>80?'…':''} »${esc(awakeLine(job))}${job.attempts?` · nouvel essai (${esc(job.status)})`:''}</div>${isMac&&state.settings.awakeMode==='wake'?`<div class="acts"><button id="awake-copy" class="btn" data-cmd="${esc(A.pmsetCommand(job.at-2*60000))}">Copier la commande de réveil</button></div><div class="tiny" id="awake-copied">Le Mac se réveillera à ${esc(hhmm(job.at-2*60000))}, enverra la relance puis se rendormira. Colle la commande dans Terminal, Entrée, puis ton mot de passe de session (invisible pendant la frappe).</div>`:terminalMode(job)?`<div class="acts"><button id="awake-copy" class="btn" data-cmd="${esc(A.caffeinateCommand(job.at+A.AWAKE_GRACE))}">Copier la commande Terminal</button></div><div class="tiny" id="awake-copied">Garde le Mac éveillé jusqu’à ${esc(hhmm(job.at+A.AWAKE_GRACE))}. Colle la commande dans Terminal (⌘V, Entrée) : rien ne s’affiche, c’est normal. Laisse la fenêtre ouverte.</div>`:''}</div>`;
     const last=resumeData.last&&resumeData.last.url===conv()?`<div class="tiny">Dernière relance : ${esc(resumeData.last.status)} · ${esc(A.dayClock(resumeData.last.at))}</div>`:'';
     if(!formOpen)return `<div class="resume">${last}<button id="resume-open" class="link">Relancer automatiquement à la réouverture…</button></div>`;
     return `<div class="resume resume-form"><div class="tiny">Envoie ce message une seule fois dans cette conversation, à l’heure choisie${limitScope()?` (seulement si le quota ${esc(name(limitScope().platform))} est bien rouvert)`:''}.</div>
       <label class="tiny">Heure${limitScope()?'':' (indiquée dans le message de limite)'}<input id="resume-time" type="time" value="${esc(form.time)}"></label>
       <label class="tiny">Message<textarea id="resume-text" rows="3" maxlength="2000">${esc(form.text)}</textarea></label>
-      ${state.settings.awakeEnabled?`<label class="tiny check"><input id="resume-awake" type="checkbox" ${form.keepAwake?'checked':''}> Garder le Mac éveillé jusque-là (Awake)</label>`:'<div class="tiny">Mac éveillé : Awake est désactivé (Paramètres).</div>'}
+      <div class="tiny">${state.settings.awakeMode==='wake'?'Après avoir programmé : copie la commande de réveil du Mac.':state.settings.awakeMode==='stay'?'Le Mac restera éveillé jusqu’à la relance (Awake).':'Si le Mac dort à cette heure-là, la relance partira à son réveil.'}</div>
       <div class="tiny warn">Envoi automatique depuis ton compte : ${esc(PL.get(site).vendor)} encadre l’usage de scripts sur son site. Laisse Safari ouvert.</div>
       <div class="acts"><button id="resume-arm" class="btn">Programmer</button><button id="resume-close" class="link">Fermer</button></div>
       ${form.error?`<div class="tiny err">${esc(form.error)}</div>`:''}</div>`;
   }
   async function arm(at){
-    try{armedInfo=await send('resumeArm',{at,message:form.text||DEFAULT_TEXT,keepAwake:form.keepAwake!==false&&state.settings.awakeEnabled});formOpen=false;form.error='';}
+    try{armedInfo=await send('resumeArm',{at,message:form.text||DEFAULT_TEXT,keepAwake:state.settings.awakeMode==='stay'});formOpen=false;form.error='';}
     catch(e){form.error=e?.message||'Programmation impossible.';}
     await loadAux();render();
   }
@@ -146,9 +148,9 @@
         <div class="track"><span class="bar ${lv}" style="width:${ok?Math.max(1.5,m.percent):0}%"></span></div>
         <div class="meta"><span>${ok&&m.detail?esc(m.detail):''}</span><span>${ok?esc(A.formatReset(m.resetAt,now)):''}</span></div>`;
     }).join('');
-    const a=A.autonomyText(A.platformAutonomy(state,pid));
+    const run=A.platformRunway(state,pid),a=A.runwayWorthShowing(run)?A.runwayText(run):'';
     const upd=st.updatedAt?`<div class="tiny ${now-st.updatedAt>A.LATE_MS?'late':''}">${esc(A.updatedText(st.updatedAt,now))}</div>`:`<div class="tiny">Lecture des quotas en cours… vérifie que tu es connecté à ${esc(p.name)}.</div>`;
-    return html+(a?`<div class="est">${esc(a)}<em>estimation</em></div>`:'')+upd;
+    return html+(a?`<div class="est">${esc(a)}${run.kind!=='reached'?'<em>estimation</em>':''}</div>`:'')+upd;
   }
   function switchBlock(){
     const sw=A.smartSwitch(state,Date.now(),main);
@@ -177,7 +179,7 @@
     const pl=pill();
     const shown=[main,...sitePlatforms.filter(p=>p!==main)].filter(p=>PL.get(p).support!=='none'),multi=shown.length>1;
     const blocks=shown.map(pid=>`${multi?`<div class="sub">${esc(name(pid))}</div>`:''}${meters(pid)}`).join('');
-    const t=toast&&!open?`<div class="toast ${esc(toast.type)}" role="status"><b>${esc(toast.title)}</b><div class="tiny">${esc(toast.body)}</div><div class="row"><button class="link" id="toast-open">Voir</button><button class="link" id="toast-close">Fermer</button></div></div>`:'';
+    const t=toast&&!open?`<div class="toast ${esc(toast.type)}" role="status"><b>${esc(toast.title)}</b><div class="tiny">${esc(toast.body)}</div><div class="row">${toast.url?'<button class="btn" id="toast-resume">Reprendre</button>':''}<button class="link" id="toast-open">Voir</button><button class="link" id="toast-close">Fermer</button></div></div>`:'';
     wrapper.innerHTML=`${t}
       <div class="panel ${open?'':'hidden'}" role="region" aria-label="AI Flow"><div class="heading"><b>${logo(site)}AI Flow · ${esc(name(site))}</b><button id="close" class="x" aria-label="Fermer">✕</button></div>
       ${limitCard()}${switchBlock()}${blocks}${resumeSection()}
@@ -187,11 +189,14 @@
   }
   function safeRender(){if(formOpen&&root.activeElement?.closest?.('.resume-form'))return;render();}
   async function handoff(to){
-    // Lecture unique de la sélection, uniquement sur ce clic.
+    // Sur ce clic uniquement : la sélection si tu en as fait une, sinon la conversation ouverte.
     const text=String(window.getSelection?.()?.toString()||'').slice(0,20000);
+    const dest=to||(site==='claude'?'chatgpt':'claude');
+    if(!text.trim()&&PL.conversationOf(location.href)){
+      try{await send('captureConversation',{});await send('openPage',{page:'transfer',query:{capture:'1',to:dest}});return;}catch{}
+    }
     try{await A.api.storage.local.set({[K.seed]:{text,source:site,ts:Date.now()}});}catch{}
-    const sw=A.smartSwitch(state,Date.now(),main);
-    send('openPage',{page:'transfer',query:{from:site,to:to||sw.available.find(s=>PL.get(s.platform).chat)?.platform||(site==='claude'?'chatgpt':'claude')}}).catch(()=>{});
+    send('openPage',{page:'transfer',query:{from:site,to:dest}}).catch(()=>{});
   }
   const $=id=>root.getElementById(id);
   function bind(){
@@ -202,6 +207,7 @@
     $('handoff')?.addEventListener('click',()=>handoff());
     $('toast-open')?.addEventListener('click',()=>{toast=null;open=true;render();});
     $('toast-close')?.addEventListener('click',()=>{toast=null;render();});
+    $('toast-resume')?.addEventListener('click',()=>{const url=toast.url;toast=null;render();if(new URL(url).host===location.host)location.href=url;else send('openUrl',{url}).catch(()=>{});});
     for(const b of root.querySelectorAll('[data-page]'))b.addEventListener('click',()=>send('openPage',{page:b.dataset.page}).catch(()=>{}));
     for(const b of root.querySelectorAll('[data-go]'))b.addEventListener('click',()=>send('openPlatform',{platform:b.dataset.go}).catch(()=>{}));
     $('resume-open')?.addEventListener('click',()=>{formOpen=true;form=defaultForm();render();});

@@ -30,6 +30,7 @@ function authorized(message,sender){
   const {op,payload}=message;
   if(op==='openPage'&&Object.hasOwn(PAGES,payload?.page))return site;
   if(op==='openPlatform'&&PL.get(payload?.platform))return site;
+  if(op==='openUrl'||op==='captureConversation')return site;
   if(op==='position'&&payload?.site===site)return site;
   if(op==='autoRefresh')return site;
   if((op==='resumeArm'||op==='resumeCancel')&&PL.get(site)?.resume)return site;
@@ -107,6 +108,7 @@ async function refreshPlatform(pid,tab){
       if(accounts[pid]!==result.account){accounts[pid]=result.account;await save(ACCOUNT_KEY,accounts);}
     }
     const {state}=await write('metrics',{platform:pid,readings});
+    await save(K.history,A.recordHistory(await load(K.history,null),readings));
     await notify(state);
   }else if(result.status==='login'){
     // Déconnecté : les anciens pourcentages ne sont plus attribuables à un compte.
@@ -165,8 +167,7 @@ async function notify(state){
   await save(K.notify,memo);
   if(!events.length)return;
   const list=A.describeEvents(events,state);
-  const drafts=await load(K.drafts,[]);
-  for(const n of list)if(n.type==='reset'&&Array.isArray(drafts)&&drafts.length)n.body+=` Ta reprise « ${String(drafts[0].title||'').slice(0,40)} » t’attend.`;
+  await recordInterruptions(events,list);
   // Toujours : bannière discrète dans le widget des pages ouvertes.
   const toasts=(await load(K.toast,[])).filter(t=>Date.now()-t.ts<3600000);
   await save(K.toast,[...toasts,...list].slice(-6));
@@ -177,10 +178,79 @@ async function notify(state){
   }
 }
 
+/* ---------- Flow Recovery : travail interrompu par une limite, puis repris ---------- */
+// Plateforme du quota → conversations concernées (Codex : tâches chatgpt.com/codex).
+const affects=(platform,url)=>{const c=PL.conversationOf(url);return !!c&&(platform==='claude'?c.platform==='claude':platform==='codex'&&c.platform==='chatgpt'&&url.includes('/codex/'));};
+const cleanTitle=t=>String(t||'').replace(/\s*[-–|]\s*(Claude|ChatGPT|Codex)\s*$/i,'').trim().slice(0,100)||'Conversation';
+async function recordInterruptions(events,notices){
+  const reached=events.filter(e=>e.type==='reached'),reopened=events.filter(e=>e.type==='reset');
+  if(!reached.length&&!reopened.length)return;
+  let list=A.cleanCheckpoints(await load(K.drafts,[]));const now=Date.now();
+  if(reached.length){
+    const tabs=(await allTabs()).sort((a,b)=>(b.active?1:0)-(a.active?1:0)||(b.lastAccessed||0)-(a.lastAccessed||0));
+    for(const e of reached){
+      for(const t of tabs.filter(t=>affects(e.platform,t.url||'')).slice(0,2)){
+        const url=PL.conversationOf(t.url).url;
+        if(list.some(d=>d.url===url&&d.kind==='interruption'&&d.status!=='done'&&now-d.updatedAt<12*3600000))continue;
+        list.unshift({id:'int-'+now+'-'+t.id,kind:'interruption',title:cleanTitle(t.title),source:PL.siteFor(url),platform:e.platform,url,fields:{},preview:'',createdAt:now,updatedAt:now,resetAt:e.resetAt||null,status:'open'});
+      }
+    }
+  }
+  for(const e of reopened){
+    for(const d of list)if(d.kind==='interruption'&&d.platform===e.platform&&d.status==='open'){d.status='ready';d.updatedAt=now;}
+    const ready=list.find(d=>d.kind==='interruption'&&d.platform===e.platform&&d.status==='ready');
+    const n=notices.find(x=>x.platform===e.platform&&x.type==='reset');
+    if(ready&&n&&!n.url){n.url=ready.url;n.body+=` Reprendre « ${ready.title.slice(0,50)} » ?`;}
+  }
+  await save(K.drafts,A.cleanCheckpoints(list));
+}
+
+/* ---------- Smart Transfer 2.0 : capture sur clic, ouverture et insertion sans envoi ---------- */
+async function captureConversation(tabId){
+  let tab;try{tab=await api.tabs.get(tabId);}catch{throw Error('Onglet introuvable.');}
+  const site=PL.siteFor(tab.url||'');
+  if(site!=='claude'&&site!=='chatgpt')throw Error('Ouvre une conversation Claude ou ChatGPT, puis réessaie.');
+  let r;
+  try{const f=await api.scripting.executeScript({target:{tabId},world:'MAIN',func:site==='claude'?R.claudeConversation:R.chatgptConversation});r=f?.[0]?.result;}
+  catch{throw Error('Safari n’autorise pas encore AI Flow à lire cet onglet. Autorise le site dans les réglages des extensions.');}
+  const messages=[];let total=0;
+  for(const m of Array.isArray(r?.messages)?r.messages.slice(-800):[]){
+    if((m?.role!=='user'&&m?.role!=='assistant')||typeof m.text!=='string')continue;
+    const text=m.text.slice(0,60000);if(!text.trim())continue;
+    total+=text.length;if(total>600000)break;messages.push({role:m.role,text});
+  }
+  if(!messages.length)throw Error('Aucun message lisible dans cet onglet. Sélectionne le texte utile et utilise « Transférer » dans la pastille, ou remplis les champs à la main.');
+  const conv=PL.conversationOf(tab.url||'');
+  const capture={ts:Date.now(),platform:site,url:conv?.url||null,title:cleanTitle(r.title||tab.title),source:r.source==='api'?'api':'page',messages};
+  await save(K.capture,capture);
+  return {count:messages.length,chars:total,title:capture.title,source:capture.source,platform:site};
+}
+const NEW_CHAT={claude:'https://claude.ai/new',chatgpt:'https://chatgpt.com/'};
+async function waitLoaded(tabId,ms=20000){
+  const end=Date.now()+ms;
+  while(Date.now()<end){try{const t=await api.tabs.get(tabId);if(t.status==='complete'&&/^https:/.test(t.url||''))return true;}catch{return false;}await new Promise(r=>setTimeout(r,400));}
+  return false;
+}
+async function openAndInsert(platform,text,insert){
+  if(!NEW_CHAT[platform])throw Error('Destination inconnue');
+  if(typeof text!=='string'||!text.trim()||text.length>200000)throw Error('Texte vide ou trop long.');
+  const tab=await api.tabs.create({url:NEW_CHAT[platform],active:true,pinned:false});
+  if(!insert)return {status:'opened'};
+  if(!await waitLoaded(tab.id))return {status:'not-loaded'};
+  try{const f=await api.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:R.insertDraft,args:[text]});return f?.[0]?.result||{status:'not-inserted'};}
+  catch(e){return {status:'injection-failed',error:String(e?.message||e).slice(0,160)};}
+}
+async function openUrl(url){
+  const conv=PL.conversationOf(url);if(!conv)throw Error('Lien non pris en charge');
+  const tab=(await allTabs()).find(t=>PL.conversationOf(t.url||'')?.url===conv.url);
+  if(tab){await focus(tab);return {tabId:tab.id,reused:true};}
+  const t=await api.tabs.create({url:conv.url,active:true,pinned:false});return {tabId:t.id,reused:false};
+}
+
 /* ---------- Awake : maintien éveillé du Mac via l'app AI Flow ---------- */
 const AWAKE_MAX_AHEAD=12*3600000,AWAKE_GRACE=10*60000;
 function desiredAwake(jobs,settings,test,now=Date.now()){
-  if(!settings.awakeEnabled)return 0;
+  if(settings.awakeMode!=='stay')return 0;
   const times=Object.values(jobs).filter(j=>j.keepAwake&&j.at-now<=AWAKE_MAX_AHEAD).map(j=>j.at+AWAKE_GRACE);
   if(Number.isFinite(test)&&test>now)times.push(test);
   return times.length?Math.max(...times):0;
@@ -201,9 +271,11 @@ async function syncKeepAwake(force=false){
 }
 async function awakeStatus(){
   const [state,info,jobs]=await Promise.all([A.getState(),load(K.awake,{}),load(K.resume,{})]);
-  const now=Date.now(),base={enabled:state.settings.awakeEnabled,until:desiredAwake(jobs,state.settings,info.testUntil,now),
-    tooFar:state.settings.awakeEnabled&&Object.values(jobs).some(j=>j.keepAwake&&j.at-now>AWAKE_MAX_AHEAD)};
+  const now=Date.now(),mode=state.settings.awakeMode,firstJob=Object.values(jobs).sort((a,b)=>a.at-b.at)[0]||null;
+  const base={mode,enabled:mode==='stay',nextAt:firstJob?.at||null,until:desiredAwake(jobs,state.settings,info.testUntil,now),
+    tooFar:mode==='stay'&&Object.values(jobs).some(j=>j.keepAwake&&j.at-now>AWAKE_MAX_AHEAD)};
   if(!hasNative())return {...base,supported:false};
+  if(mode!=='stay')return {...base,supported:true};
   const reply=await nativeCall({type:'AI_FLOW_AWAKE_STATUS'});
   const next={...info,reachable:!!reply,appInstalled:reply?.appInstalled??null,appRunning:reply?.appRunning??null,error:reply?.error||null,checkedAt:now};
   await save(K.awake,next);
@@ -211,7 +283,7 @@ async function awakeStatus(){
 }
 async function awakeTest(){
   const state=await A.getState();
-  if(!state.settings.awakeEnabled)throw Error('Active d’abord Awake.');
+  if(state.settings.awakeMode!=='stay')throw Error('Choisis d’abord le mode « Rester éveillé ».');
   if(!hasNative())throw Error('Awake nécessite Safari sur Mac avec l’app AI Flow.');
   const info=await load(K.awake,{});await save(K.awake,{...info,testUntil:Date.now()+2*60000});
   await syncKeepAwake(true);
@@ -232,7 +304,7 @@ async function resumeArm(payload,sender){
   const jobs=await resumeJobs();
   for(const [k,j] of Object.entries(jobs))if(j.url===conv.url){delete jobs[k];try{await api.alarms.clear('ai-flow-resume:'+k);}catch{}}
   const id=String(now);
-  jobs[id]={id,platform:conv.platform,url:conv.url,tabId:sender.tab.id,message:text,at,keepAwake:payload.keepAwake!==false,attempts:0,status:'armed',armedAt:now};
+  jobs[id]={id,platform:conv.platform,url:conv.url,tabId:sender.tab.id,message:text,at,plannedAt:at,keepAwake:payload.keepAwake!==false,attempts:0,status:'armed',armedAt:now};
   await save(K.resume,jobs);
   await api.alarms.create('ai-flow-resume:'+id,{when:at});
   const awake=await syncKeepAwake(true);
@@ -274,11 +346,15 @@ async function injectResume(text,platform){
 const RESUME_LABELS={sent:'envoyée',draft:'annulée : un brouillon était en cours','no-composer':'zone de saisie introuvable','not-sent':'message non parti','injection-failed':'onglet inaccessible','quota-plein':'quota encore plein',chargement:'page en chargement','ouverture-onglet':'réouverture de la conversation'};
 async function fireResume(id){
   const job=(await resumeJobs())[id];if(!job)return;
+  // Déjà reprogrammée plus tard (alarme et rattrapage peuvent se croiser) : rien à faire maintenant.
+  if(job.at>Date.now()+30000)return;
   const name=PL.get(job.platform)?.name||'IA';
   const finish=async status=>{
     const all=await resumeJobs();delete all[id];await save(K.resume,all);await syncKeepAwake();
-    await save(K.resumeLast,{url:job.url,platform:job.platform,status,at:Date.now()});
-    const n={id:'resume-'+Date.now(),platform:job.platform,type:'resume',title:`AI Flow · relance ${status==='envoyée'?'envoyée':'non envoyée'}`,body:`${name} : ${status}`,ts:Date.now()};
+    const planned=job.plannedAt||job.at,now=Date.now(),late=status==='envoyée'&&now-planned>10*60000;
+    await save(K.resumeLast,{url:job.url,platform:job.platform,status,at:now,plannedAt:planned,late});
+    const body=late?`${name} : envoyée à ${A.clock(now)}, rattrapée au réveil du Mac (prévue à ${A.clock(planned)}).`:`${name} : ${status}`;
+    const n={id:'resume-'+now,platform:job.platform,type:'resume',title:`AI Flow · relance ${status==='envoyée'?(late?'rattrapée':'envoyée'):'non envoyée'}`,body,ts:now};
     await save(K.toast,[...(await load(K.toast,[])),n].slice(-6));
     if((await A.getState()).settings.systemNotifications){
       if(api.notifications?.create){try{await api.notifications.create('ai-flow:'+n.id,{type:'basic',iconUrl:'icons/icon128.png',title:n.title,message:n.body});}catch{}}
@@ -332,6 +408,9 @@ async function handle(message,sender){
   switch(op){
     case 'openPage':return openPage(payload?.page,payload?.query);
     case 'openPlatform':return openPlatform(payload?.platform);
+    case 'openUrl':return openUrl(String(payload?.url||''));
+    case 'captureConversation':return captureConversation(origin==='page'?Number(payload?.tabId):sender.tab.id);
+    case 'openAndInsert':return openAndInsert(payload?.platform,payload?.text,payload?.insert!==false);
     case 'connectionStatuses':return connectionStatuses();
     case 'refresh':return autoRefresh(PL.ids(),true);
     case 'autoRefresh':{
@@ -343,13 +422,14 @@ async function handle(message,sender){
     case 'resumeCancel':return resumeCancel(String(payload?.id||''));
     case 'awakeStatus':return awakeStatus();
     case 'awakeTest':return awakeTest();
+    case 'clearHistory':await save(K.history,null);return true;
     case 'clear':{
       await api.storage.local.set({[K.diag]:{},[K.notify]:null,[ACCOUNT_KEY]:{}});
       await write('clear');await badge();return true;
     }
     case 'settings':{
       const {value}=await write('settings',payload);
-      if(payload&&('awakeEnabled' in payload))await syncKeepAwake(true);
+      if(payload&&('awakeEnabled' in payload||'awakeMode' in payload))await syncKeepAwake(true);
       await badge();return value;
     }
     case 'position':return (await write('position',payload)).value;
@@ -357,7 +437,7 @@ async function handle(message,sender){
     default:throw Error('Commande inconnue');
   }
 }
-const DIRECT_OPS=new Set(['openPage','openPlatform','connectionStatuses','awakeStatus']);
+const DIRECT_OPS=new Set(['openPage','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert']);
 api.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message?.type!=='AI_FLOW')return false;
   // Ouvertures d'onglets et lectures : immédiates, sans attendre la file des écritures.
@@ -366,7 +446,7 @@ api.runtime.onMessage.addListener((message,sender,reply)=>{
   return true;
 });
 api.alarms.onAlarm.addListener(alarm=>{
-  if(alarm.name===ALARM)serial(async()=>{await autoRefresh(PL.ids());await syncKeepAwake();await badge();});
+  if(alarm.name===ALARM)serial(async()=>{await autoRefresh(PL.ids());await syncKeepAwake();await badge();await catchUp();});
   else if(alarm.name.startsWith('ai-flow-resume:'))serial(()=>fireResume(alarm.name.slice('ai-flow-resume:'.length)));
 });
 api.notifications?.onClicked?.addListener(id=>{const pid=id.split(':')[1];if(PL.get(pid))serial(()=>openPlatform(pid));});
@@ -378,10 +458,15 @@ async function install(){
 }
 api.runtime.onInstalled.addListener(()=>serial(async()=>{
   // Migration 0.8.0 : suppression des anciens suivis (rechargeaient des onglets) et clés obsolètes.
-  try{await api.storage.local.remove(['ai_flow_trackers_v3','ai_flow_alerts_v3','ai_flow_claude_org_v1','ai_flow_native_status',K.history]);}catch{}
+  try{await api.storage.local.remove(['ai_flow_trackers_v3','ai_flow_alerts_v3','ai_flow_claude_org_v1','ai_flow_native_status']);}catch{}
   const s=await A.getState();await api.storage.local.set({[A.KEY]:s});
   await install();
 }));
-api.runtime.onStartup?.addListener(()=>serial(install));
+// Rattrapage : une relance dont l'heure est passée (Mac endormi, Safari fermé) part dès que possible.
+async function catchUp(){
+  const now=Date.now();
+  for(const [id,j] of Object.entries(await resumeJobs()))if(j.at<=now-2*60000)await fireResume(id);
+}
+api.runtime.onStartup?.addListener(()=>serial(async()=>{await install();await catchUp();}));
 serial(install);
-if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume});
+if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,captureConversation,recordInterruptions});

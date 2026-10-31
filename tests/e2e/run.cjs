@@ -7,7 +7,7 @@ const shots=process.argv[2]||path.join(root,'dist','shots');
 fs.mkdirSync(shots,{recursive:true});
 execFileSync('node',[path.join(root,'tools','build.mjs')],{stdio:'inherit'});
 const ext=path.join(root,'dist','chrome-edge');
-const ORG='0b2c6c1e-1234-4abc-8def-001122334455';
+const ORG='0b2c6c1e-1234-4abc-8def-001122334455',CONV='11111111-2222-4333-8444-555555555555';
 const H=3600000,iso=ms=>new Date(Date.now()+ms).toISOString();
 const results=[];let failed=0;
 function check(name,cond,detail=''){results.push(`${cond?'✓':'✗'} ${name}${!cond&&detail?' — '+detail:''}`);if(!cond)failed++;}
@@ -24,13 +24,14 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     const u=new URL(r.request().url());
     if(u.pathname==='/api/organizations')return r.fulfill({json:[{uuid:ORG,capabilities:['chat']}]});
     if(u.pathname===`/api/organizations/${ORG}/usage`)return r.fulfill({json:claude});
+    if(u.pathname===`/api/organizations/${ORG}/chat_conversations/${CONV}`)return r.fulfill({json:{name:'Refonte page tarifs',chat_messages:[{index:0,sender:'human',text:'Objectif : refaire la page tarifs en trois offres.'},{index:1,sender:'assistant',text:'Proposition : Starter, Pro, Équipe.'},{index:2,sender:'human',text:'Écris maintenant la FAQ.'}]}});
     return r.fulfill({contentType:'text/html',body:page('Claude',u.pathname.startsWith('/chat/')?composer:'')});
   });
   await ctx.route('https://chatgpt.com/**',r=>{
     const u=new URL(r.request().url());
     if(u.pathname==='/api/auth/session')return r.fulfill({json:{accessToken:'fake-token-never-stored'}});
     if(u.pathname==='/backend-api/wham/usage')return r.fulfill({json:{rate_limit:{primary_window:{limit_window_seconds:18000,used_percent:codexUsed,reset_at:Math.floor(Date.now()/1000)+3*3600},secondary_window:{limit_window_seconds:604800,used_percent:41}}}});
-    return r.fulfill({contentType:'text/html',body:page('ChatGPT',u.pathname.startsWith('/codex/tasks/')?composer:'')});
+    return r.fulfill({contentType:'text/html',body:page('ChatGPT',composer)});
   });
   let [sw]=ctx.serviceWorkers();if(!sw)sw=await ctx.waitForEvent('serviceworker');
   const id=new URL(sw.url()).host,E=p=>`chrome-extension://${id}/${p}`;
@@ -56,7 +57,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const text=h=>h.replace(/<style[\s\S]*?<\/style>/g,'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ');
 
   // 1. Onglets ouverts par l'utilisateur : lecture automatique sans clic.
-  const pc=await ctx.newPage();await pc.goto('https://claude.ai/chat/abc-123');
+  const pc=await ctx.newPage();await pc.goto('https://claude.ai/chat/'+CONV);
   const pg=await ctx.newPage();await pg.goto('https://chatgpt.com/c/xyz');
   await pc.bringToFront();await pc.waitForTimeout(4000);
   let st=await storage('ai_flow_state_v1');
@@ -98,13 +99,17 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const hidden=(await storage('ai_flow_state_v1')).settings.platformHidden.codex===true;
   await opt.locator('[data-visible="codex"]').check();await opt.waitForTimeout(400);
   await opt.locator('[data-move="codex"][data-dir="-1"]').click();await opt.waitForTimeout(300);
-  await opt.locator('[data-setting="awakeEnabled"]').check();await opt.waitForTimeout(800);
-  check('Awake hors Mac : indisponible, pas de commande Terminal',/Indisponible sur cet appareil/.test(await opt.locator('#awake-state').innerText())&&await opt.locator('#awake-terminal').isHidden());
+  await opt.locator('input[name="awakeMode"][value="wake"]').check();await opt.waitForTimeout(800);
+  check('Awake : mode « Réveil programmé » enregistré',(await storage('ai_flow_state_v1')).settings.awakeMode==='wake');
+  check('Awake : rattrapage au réveil par défaut, expliqué (FAQ)',await opt.locator('.faq dt').count()>=5);
+  await opt.locator('#threshold').selectOption('70');await opt.waitForTimeout(400);
+  check('Alertes : seuil personnalisable (70 %)',(await storage('ai_flow_state_v1')).settings.alertThreshold===70);
+  await opt.locator('#threshold').selectOption('90');await opt.waitForTimeout(300);
   st=await storage('ai_flow_state_v1');
   check('Paramètres : masquer / réafficher une IA enregistré',hidden&&!st.settings.platformHidden.codex);
   check('Paramètres : seules les IA mesurables listées',await opt.locator('.prow').count()===2);
   check('Paramètres : ordre modifié',st.settings.platformOrder.indexOf('codex')<st.settings.platformOrder.indexOf('claude'));
-  check('Paramètres : Awake activable, état « indisponible » hors Safari',/Indisponible/.test(await opt.locator('#awake-state').innerText()));
+  check('Awake hors Mac : indiqué comme indisponible ici',/Mac uniquement/.test(await opt.locator('#awake-state').innerText()));
   await opt.locator('[data-setting="notifyApproaching"]').uncheck();await opt.waitForTimeout(300);
   check('Paramètres : type de notification désactivable',(await storage('ai_flow_state_v1')).settings.notifyApproaching===false);
   await opt.locator('[data-setting="notifyApproaching"]').check();
@@ -135,8 +140,15 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   await dash.bringToFront();await dash.reload();await dash.waitForTimeout(1500);
   const dText=await dash.locator('body').innerText();
   check('Tableau de bord : Smart Switch propose Codex (capacité confirmée)',/Smart Switch[\s\S]*Claude approche de sa limite[\s\S]*Capacité confirmée/i.test(dText)&&/Codex/.test(dText));
-  check('Tableau de bord : autonomie estimée signalée comme estimation',/À ton rythme actuel|ne devrait pas être atteinte/.test(dText)&&/Estimation/.test(dText),dText.slice(0,600));
-  check('Tableau de bord : plus d’historique ni de Grok',!/Ma consommation|Historique|Grok/.test(dText));
+  check('Tableau de bord : prévision prudente, signalée comme estimation, sans fourchette en heures',/tu risques d’atteindre la limite|ne devrait pas être atteinte|Risque d’atteindre|historique insuffisant|aucune consommation récente/.test(dText)&&!/\d+ h à \d+ h/.test(dText),dText.slice(0,600));
+  check('Tableau de bord : historique conservé, consommation en barres',await dash.locator('#chart svg rect.use').count()>0&&!/Grok/.test(dText));
+  await dash.locator('#chart').scrollIntoViewIfNeeded();await dash.waitForTimeout(200);
+  const box=await dash.locator('#chart svg').boundingBox();
+  await dash.mouse.move(box.x+box.width-12,box.y+box.height-40);await dash.waitForTimeout(250);
+  const tipText=await dash.locator('#tip').innerText().catch(()=>'');
+  check('Historique : infobulle au survol (heure, quota, consommation, relevés réels)',await dash.locator('#tip').isVisible()&&/Claude · Session/.test(tipText)&&/Consommé/.test(tipText)&&/relevé/.test(tipText),tipText);
+  await dash.screenshot({path:path.join(shots,'dashboard-tooltip.png')});
+  await dash.mouse.move(5,5);
   await dash.locator('#refresh').click();await dash.waitForFunction(()=>document.getElementById('refresh').textContent==='Actualiser',null,{timeout:15000}).catch(()=>{});
   check('Tableau de bord : « Actualiser » fonctionne et revient à l’état normal',(await dash.locator('#refresh').innerText())==='Actualiser'&&await dash.locator('#refresh').isEnabled());
   await dash.screenshot({path:path.join(shots,'dashboard.png'),fullPage:true});
@@ -159,15 +171,17 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const job=jobs&&Object.values(jobs)[0];
   check('Relance programmée à la réouverture + 2 min',!!job&&Math.abs(job.at-(resetAt+120000))<2000,JSON.stringify(jobs));
   w=await widget(pc);await w.click('#toggle');await pc.waitForTimeout(300);await pc.screenshot({path:path.join(shots,'widget-armed.png')});
-  // Mode Terminal (sans app Mac / sans Xcode) : Mac simulé.
+  // Réveil programmé (sans app Mac / sans Xcode) : Mac simulé.
   const macOpt=await ctx.newPage();await macOpt.addInitScript(()=>Object.defineProperty(Navigator.prototype,'platform',{get:()=>'MacIntel'}));
   await macOpt.setViewportSize({width:1000,height:900});await macOpt.goto(E('options.html'));await macOpt.waitForTimeout(1200);
   const cmd=await macOpt.locator('#awake-cmd').innerText().catch(()=>'');
-  const expectSec=job?Math.round((job.at+600000-Date.now())/1000):0;
-  check('Awake sans app : commande Terminal calculée pour la relance',await macOpt.locator('#awake-terminal').isVisible()&&/^caffeinate -i -t \d+$/.test(cmd)&&Math.abs(Number(cmd.split(' ').pop())-expectSec)<15,cmd);
-  await macOpt.locator('#awake-terminal').scrollIntoViewIfNeeded();await macOpt.screenshot({path:path.join(shots,'options-awake-terminal.png')});await macOpt.close();
+  check('Réveil programmé : commande pmset calculée 2 min avant la relance',await macOpt.locator('#awake-terminal').isVisible()&&/^sudo pmset schedule wake "\d\d\/\d\d\/\d\d \d\d:\d\d:00"$/.test(cmd),cmd);
+  await macOpt.locator('#awake-terminal').scrollIntoViewIfNeeded();await macOpt.screenshot({path:path.join(shots,'options-awake.png')});
+  await macOpt.locator('input[name="awakeMode"][value="catchup"]').check();await macOpt.waitForTimeout(400);await macOpt.close();
+  const tl=await storage('ai_flow_drafts_v1');
+  check('Flow Recovery : conversation interrompue notée (titre + lien, sans contenu)',(tl||[]).some(d=>d.kind==='interruption'&&d.url==='https://claude.ai/chat/'+CONV&&!d.preview),JSON.stringify(tl));
   // Avance l'horloge de la relance (alarme dans 3 s) au lieu d'attendre 3 minutes.
-  if(job)await sw.evaluate(id=>chrome.alarms.create('ai-flow-resume:'+id,{when:Date.now()+3000}),job.id);
+  if(job)await sw.evaluate(async id=>{const v=(await chrome.storage.local.get('ai_flow_resume_v1')).ai_flow_resume_v1;v[id].at=Date.now()+2000;await chrome.storage.local.set({ai_flow_resume_v1:v});await chrome.alarms.create('ai-flow-resume:'+id,{when:Date.now()+3000});},job.id);
   claude={five_hour:{utilization:2,resets_at:iso(5*H)},seven_day:{utilization:21,resets_at:iso(70*H)}};
   await pc.waitForFunction(()=>document.title.startsWith('SENT:'),null,{timeout:70000}).catch(()=>{});
   check('Relance envoyée une seule fois dans la conversation',(await pc.title()).startsWith('SENT:Continue'),await pc.title());
@@ -176,6 +190,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   check('Résultat de relance enregistré',last?.status==='envoyée',JSON.stringify(last));
   const t2=await storage('ai_flow_toast_v1');
   check('Notification « de nouveau disponible » après relevé confirmé',(t2||[]).some(t=>t.type==='reset'&&t.platform==='claude'),JSON.stringify(t2?.map(t=>t.type)));
+  check('Flow Recovery : « Reprendre » proposé avec le lien de la conversation',(t2||[]).some(t=>t.type==='reset'&&t.url==='https://claude.ai/chat/'+CONV&&/Reprendre/.test(t.body)));
 
   // 6 bis. Codex : quota atteint dans une tâche → même proposition automatique que Claude.
   codexUsed=100;
@@ -187,30 +202,44 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const pchat=await ctx.newPage();await pchat.goto('https://chatgpt.com/c/conversation-normale');await pchat.waitForTimeout(2000);
   check('Conversation ChatGPT classique : pas de carte Codex',!/Quota Codex atteint/.test(text((await widget(pchat)).html)));
   await pchat.close();await px.close();codexUsed=12;
-  // 7. Transfert : sélection → page structurée → reprise enregistrée.
-  await pc.evaluate(()=>{const r=document.createRange();r.selectNodeContents(document.querySelector('p'));getSelection().removeAllRanges();getSelection().addRange(r);});
-  w=await widget(pc);await w.click('#toggle');w=await widget(pc);await w.click('#transfer');await pc.waitForTimeout(1200);
+  // 7. Smart Transfer 2.0 : la conversation ouverte (sur clic) → message de reprise → insertion dans ChatGPT.
+  await pc.bringToFront();await pc.evaluate(()=>getSelection().removeAllRanges());
+  w=await widget(pc);if(!/AI Flow · Claude/.test(text(w.html))||/class="panel hidden/.test(w.html)){await w.click('#toggle');w=await widget(pc);}
+  await w.click('#transfer');await pc.waitForTimeout(2500);
   const tr=ctx.pages().find(p=>p.url().startsWith(E('transfer.html')));
   check('Transfert ouvert depuis la pastille',!!tr);
   if(tr){
-    await tr.bringToFront();await tr.waitForTimeout(500);
-    check('Transfert : destination différente de la source',await tr.locator('#target').inputValue()!==await tr.locator('#source').inputValue());
-    check('Transfert : sélection reprise dans « Extrait »',/conversation fictive/.test(await tr.locator('[data-field="excerpt"]').inputValue()));
-    await tr.locator('#title').fill('Refonte page tarifs');
-    await tr.locator('[data-field="goal"]').fill('Livrer la nouvelle page tarifs');
-    await tr.locator('[data-field="next"]').fill('1. Valider les prix\n2. Écrire la FAQ');
+    await tr.bringToFront();await tr.waitForTimeout(600);
+    const info=await tr.locator('#source-info').innerText().catch(()=>'');
+    check('Transfert : conversation récupérée (3 messages, titre)',/Refonte page tarifs/.test(info)&&/3 messages/.test(info),info);
+    check('Transfert : destination différente de la source',await tr.locator('#target').inputValue()==='chatgpt');
     const prev=await tr.locator('#preview').inputValue();
-    check('Transfert : aperçu structuré',/## Objectif\nLivrer la nouvelle page tarifs/.test(prev)&&/## Prochaines actions/.test(prev)&&/commencé sur Claude/.test(prev));
-    await tr.locator('#preview').fill(prev+'\nNote perso.');
-    await tr.locator('[data-field="done"]').fill('Maquette OK');
+    check('Transfert : objectif pré-rempli, derniers échanges dans l’ordre et par rôle',/## Objectif\nObjectif : refaire la page tarifs/.test(prev)&&/## Derniers échanges/.test(prev)&&prev.indexOf('**Moi :**\nObjectif')<prev.indexOf('**Claude :**\nProposition')&&prev.indexOf('Proposition')<prev.lastIndexOf('Écris maintenant la FAQ'),prev.slice(0,500));
+    await tr.locator('input[name="mode"][value="full"]').check();await tr.waitForTimeout(200);
+    check('Transfert : mode « conversation complète »',/Voici une conversation commencée sur Claude/.test(await tr.locator('#preview').inputValue()));
+    await tr.locator('input[name="mode"][value="resume"]').check();
+    await tr.locator('[data-field="decisions"]').fill('Trois offres');
+    await tr.locator('#preview').fill((await tr.locator('#preview').inputValue())+'\nNote perso.');
     check('Transfert : aperçu modifié conservé',/Note perso/.test(await tr.locator('#preview').inputValue()));
     await tr.locator('#save').click();await tr.waitForTimeout(400);
     const drafts=await storage('ai_flow_drafts_v1');
-    check('Reprise enregistrée localement',drafts?.[0]?.title==='Refonte page tarifs');
+    check('Point de reprise enregistré (avec lien de la conversation)',(drafts||[]).some(d=>d.kind==='checkpoint'&&d.title==='Refonte page tarifs'&&d.url==='https://claude.ai/chat/'+CONV));
     await tr.setViewportSize({width:1200,height:900});await tr.screenshot({path:path.join(shots,'transfer.png'),fullPage:true});
+    const known=new Set(ctx.pages());
+    await tr.locator('#go').click();
+    let dest=null;for(let i=0;i<40&&!dest;i++){await tr.waitForTimeout(300);dest=ctx.pages().find(p=>!known.has(p)&&p.url().startsWith('https://chatgpt.com/'));}
+    for(let i=0;i<40;i++){await tr.waitForTimeout(300);if(/Inséré|ouvert/.test(await tr.locator('#status').innerText()))break;}
+    check('Transfert : ChatGPT ouvert dans un nouvel onglet, message copié en secours',!!dest&&/ouvert|Inséré/.test(await tr.locator('#status').innerText()));
+    // Les onglets créés par l'extension échappent aux sites simulés (page d'erreur réseau) :
+    // l'insertion est donc vérifiée sur l'onglet ChatGPT simulé déjà ouvert, avec la même fonction.
+    const pgTab=await sw.evaluate(async()=>(await chrome.tabs.query({})).find(t=>(t.url||'').startsWith('https://chatgpt.com/c/'))?.id);
+    const ins=await sw.evaluate(async([tabId,text])=>(await chrome.scripting.executeScript({target:{tabId},world:'MAIN',func:globalThis.AIFlowReaders.insertDraft,args:[text]}))[0].result,[pgTab,await tr.locator('#preview').inputValue()]);
+    const inserted=await pg.evaluate(()=>document.querySelector('.ProseMirror')?.textContent||'');
+    check('Transfert : message inséré dans la zone de saisie de ChatGPT, sans envoi',ins?.status==='inserted'&&/Je reprends avec toi un travail commencé sur Claude/.test(inserted)&&!(await pg.title()).startsWith('SENT'),JSON.stringify(ins));
+    if(dest)await dest.close();
   }
   const pop2=await ctx.newPage();await pop2.setViewportSize({width:380,height:600});await pop2.goto(E('popup.html'));await pop2.waitForTimeout(1200);
-  check('Popup : reprise accessible',/reprise enregistrée/i.test(await pop2.locator('body').innerText()));
+  check('Popup : points de reprise et travail interrompu accessibles',/point(s)? de reprise/i.test(await pop2.locator('body').innerText()));
   await pop2.screenshot({path:path.join(shots,'popup-continuity.png')});
   await pop2.emulateMedia({colorScheme:'light'});await pop2.waitForTimeout(200);await pop2.screenshot({path:path.join(shots,'popup-light.png')});
 

@@ -43,7 +43,7 @@ test('Origine : un site ne peut ni effacer ni changer les réglages',async()=>{
   const {fb,call}=setup();
   const s=site(fb,'https://claude.ai/chat/abc');
   assert.equal((await call('clear',null,s)).ok,false);
-  assert.equal((await call('settings',{awakeEnabled:true},s)).ok,false);
+  assert.equal((await call('settings',{awakeMode:'stay'},s)).ok,false);
   assert.equal((await call('openPage',{page:'transfer'},s)).ok,true);
   const evil={id:'ext',url:'https://evil.example/',frameId:0,tab:{id:99}};
   assert.equal((await call('openPage',{page:'options'},evil)).ok,false);
@@ -113,10 +113,10 @@ test('Safari Mac : notification transmise à l’app AI Flow',async()=>{
 test('Awake : désactivé par défaut, borné à 12 h, +10 min de marge',()=>{
   const {T}=setup();
   const now=Date.now(),job={keepAwake:true,at:now+3600000};
-  assert.equal(T.desiredAwake({a:job},{awakeEnabled:false},null,now),0);
-  assert.equal(T.desiredAwake({a:job},{awakeEnabled:true},null,now),job.at+600000);
-  assert.equal(T.desiredAwake({a:{keepAwake:true,at:now+13*3600000}},{awakeEnabled:true},null,now),0);
-  assert.equal(T.desiredAwake({a:{...job,keepAwake:false}},{awakeEnabled:true},null,now),0);
+  assert.equal(T.desiredAwake({a:job},{awakeMode:'catchup'},null,now),0);
+  assert.equal(T.desiredAwake({a:job},{awakeMode:'stay'},null,now),job.at+600000);
+  assert.equal(T.desiredAwake({a:{keepAwake:true,at:now+13*3600000}},{awakeMode:'stay'},null,now),0);
+  assert.equal(T.desiredAwake({a:{...job,keepAwake:false}},{awakeMode:'stay'},null,now),0);
 });
 test('Awake : armement → demande à l’app, annulation → arrêt ; jamais lancé si désactivé',async()=>{
   const {fb,call}=setup({native:true,nativeReply:m=>({ok:true,appInstalled:true,appRunning:m.until>0})});
@@ -125,7 +125,7 @@ test('Awake : armement → demande à l’app, annulation → arrêt ; jamais la
   let r=await call('resumeArm',{at,message:'Continue',keepAwake:true},s);
   assert.equal(r.ok,true);
   assert.equal(fb.native.filter(m=>m.type==='AI_FLOW_KEEP_AWAKE').length,0,'Awake désactivé : app non sollicitée');
-  await call('settings',{awakeEnabled:true});
+  await call('settings',{awakeMode:'stay'});
   const sent=fb.native.filter(m=>m.type==='AI_FLOW_KEEP_AWAKE');
   assert.equal(sent.at(-1).until,at+600000);
   const st=await call('awakeStatus');
@@ -135,7 +135,7 @@ test('Awake : armement → demande à l’app, annulation → arrêt ; jamais la
 });
 test('Awake : indisponible hors Safari (pas de nativeMessaging)',async()=>{
   const {call}=setup();
-  await call('settings',{awakeEnabled:true});
+  await call('settings',{awakeMode:'stay'});
   const st=await call('awakeStatus');
   assert.equal(st.value.supported,false);
   assert.equal((await call('awakeTest')).ok,false);
@@ -150,7 +150,7 @@ test('Relance : uniquement depuis une conversation, message borné',async()=>{
 });
 test('Safari sans app Mac : un appel natif sans réponse ne bloque plus rien',async()=>{
   const {call,fb,A}=setup({native:true,nativeReply:()=>new Promise(()=>{})});
-  await call('settings',{awakeEnabled:true});
+  await call('settings',{awakeMode:'stay'});
   const t0=Date.now();
   const status=call('awakeStatus');
   const settings=await call('settings',{focusMode:false});
@@ -172,10 +172,29 @@ test('Relance Codex : attend que le quota Codex soit vraiment rouvert, puis envo
   fb.addTab('https://chatgpt.com/codex');
   const s=site(fb,'https://chatgpt.com/codex/tasks/task_e_1');
   const r=await call('resumeArm',{at:Date.now()+60000,message:'Continue'},s);
-  await T.fireResume(r.value.id);
+  const due=()=>{fb.store['ai_flow_resume_v1'][r.value.id].at=Date.now()-1000;};
+  due();await T.fireResume(r.value.id);
   assert.equal(fb.store['ai_flow_resume_v1'][r.value.id].status,'quota encore plein','pas d’envoi tant que Codex est plein');
   setCodex({used5:2,usedW:41});
-  await T.fireResume(r.value.id);
+  due();await T.fireResume(r.value.id);
   assert.equal(fb.store['ai_flow_resume_v1'][r.value.id],undefined);
   assert.equal(fb.store['ai_flow_resume_last_v1'].status,'envoyée');
+});
+test('Rattrapage : relance manquée (Mac endormi) envoyée au réveil et signalée comme rattrapée',async()=>{
+  const {fb,call,T}=setup();
+  const s=site(fb,'https://claude.ai/chat/abc');
+  const r=await call('resumeArm',{at:Date.now()+60000,message:'Continue'},s);
+  const job=fb.store['ai_flow_resume_v1'][r.value.id];
+  job.at=job.plannedAt=Date.now()-7*3600000; // prévue cette nuit, le Mac dormait
+  await T.catchUp();
+  assert.equal(fb.store['ai_flow_resume_v1'][r.value.id],undefined);
+  const last=fb.store['ai_flow_resume_last_v1'];
+  assert.equal(last.status,'envoyée');assert.equal(last.late,true);
+  assert.match(fb.store['ai_flow_toast_v1'].at(-1).body,/rattrapée au réveil/);
+});
+test('Mode Awake par défaut : rattrapage (aucune commande, aucune app sollicitée)',async()=>{
+  const {call,fb}=setup({native:true,nativeReply:()=>({ok:true})});
+  const st=await call('awakeStatus');
+  assert.equal(st.value.mode,'catchup');
+  assert.equal(fb.native.length,0);
 });

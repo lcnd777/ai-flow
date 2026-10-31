@@ -29,20 +29,20 @@
     return {text:`Ouvre ${p.name} dans un onglet pour actualiser`,cls:'muted',action:'open'};
   }
   const LEVEL_LABEL={critical:'Limite proche',warning:'À surveiller',healthy:'Disponible',unknown:'Indisponible',unmeasured:'Non mesuré'};
-  function chip(st){
-    if(st.limitReached)return '<span class="chip critical">Limite atteinte</span>';
-    return `<span class="chip ${st.level}">${LEVEL_LABEL[st.level]}</span>`;
-  }
+  const RADAR={available:['healthy','Disponible'],near:['warning','Proche de la limite'],reached:['critical','Limite atteinte'],'reset-soon':['warning','Reset imminent'],stale:['unknown','Données périmées'],unknown:['unknown','Indisponible'],unmeasured:['unknown','Non mesuré']};
+  function chip(st){const [cls,label]=RADAR[st.radar]||RADAR.unknown;return `<span class="chip ${cls}">${label}</span>`;}
   function platformCard(state,pid,conn,opts={}){
     const p=A.platform(pid),st=A.platformStatus(state,pid),c=connection(state,pid,conn);
     if(opts.compact&&p.support==='none')return `<article class="pcard slim" data-platform="${pid}" title="${esc(p.note)}">
       <header>${logo(pid)}<div class="pname"><b>${esc(p.name)}</b></div>${chip(st)}<button class="ghost small" data-open-platform="${pid}">Ouvrir ↗</button></header></article>`;
     const ids=opts.all?st.ids:p.primary;
-    const auto=A.platformAutonomy(state,pid),autoTxt=A.autonomyText(auto);
+    const run=A.platformRunway(state,pid),shown=opts.all?run:(A.runwayWorthShowing(run)?run:null);
+    const autoTxt=shown?A.runwayText(shown,Date.now(),{verbose:!!opts.all}):'';
+    const risky=shown&&['risk','risk-uncertain','reached'].includes(shown.kind);
     const tag=p.support==='experimental'?'<span class="tag">expérimental</span>':'';
     const body=p.support==='none'
       ?`<p class="note">${esc(p.note)}</p>`
-      :ids.map(id=>meter(state,id)).join('')+(autoTxt?`<p class="estimate" title="Estimation calculée sur ${auto.observations} relevés locaux : ce n’est pas une donnée officielle.">${esc(autoTxt)} <em>Estimation</em></p>`:'');
+      :ids.map(id=>meter(state,id)).join('')+(autoTxt?`<p class="estimate${risky?' risky':''}" title="Calculée sur cet appareil à partir de tes relevés : ce n’est pas une donnée officielle.">${esc(autoTxt)}${['risk','risk-uncertain','safe'].includes(shown.kind)?' <em>Estimation</em>':''}</p>`:'');
     const action=c.action==='open'?`<button class="ghost small" data-open-platform="${pid}">Ouvrir ↗</button>`:'';
     return `<article class="pcard lvl-${st.limitReached?'critical':st.level}" data-platform="${pid}">
       <header>${logo(pid)}<div class="pname"><b>${esc(p.name)}</b>${tag}</div>${chip(st)}</header>
@@ -67,21 +67,22 @@
   const isMac=()=>/Mac/i.test(navigator.platform||navigator.userAgent)&&!(navigator.maxTouchPoints>1)&&!/iPhone|iPad/i.test(navigator.userAgent);
   function awakeText(s){
     if(!s)return {text:'Vérification…',cls:'muted'};
-    if(!s.enabled)return {text:'Désactivé',cls:'muted'};
+    if(s.mode==='catchup'||!s.mode)return {text:'Rattrapage au réveil : une relance manquée part dès que le Mac se réveille',cls:'ok'};
+    if(!isMac())return {text:'Indisponible sur cet appareil (Mac uniquement) : rattrapage au réveil',cls:'warn'};
+    if(s.mode==='wake')return s.nextAt?{text:`Réveil programmé : commande à coller pour la relance de ${A.dayClock(s.nextAt)}`,cls:'warn'}:{text:'Réveil programmé : prêt pour la prochaine relance',cls:'ok'};
     if(s.supported===false||!s.reachable||s.error==='unsupported-platform'){
-      if(s.error==='unsupported-platform'||!isMac())return {text:'Indisponible sur cet appareil (Mac uniquement)',cls:'warn'};
-      if(s.until>Date.now())return {text:`Mode Terminal : lance la commande ci-dessous (jusqu’à ${A.dayClock(s.until)})`,cls:'warn'};
-      return {text:'Mode Terminal (sans app Mac) : la commande apparaîtra à la prochaine relance',cls:'muted'};
+      if(s.until>Date.now())return {text:`Rester éveillé : lance la commande ci-dessous (jusqu’à ${A.dayClock(s.until)})`,cls:'warn'};
+      return {text:'Rester éveillé : la commande apparaîtra à la prochaine relance',cls:'muted'};
     }
-    if(s.until>Date.now())return s.appRunning?{text:`Actif jusqu’à ${A.dayClock(s.until)}`+(s.holding===false?' (en pause : batterie faible)':''),cls:'ok'}:{text:'Indisponible : l’app AI Flow ne s’est pas lancée',cls:'warn'};
-    if(s.tooFar)return {text:'Prêt · relance prévue dans plus de 12 h : le Mac pourra se mettre en veille',cls:'muted'};
-    return {text:'Prêt · s’activera à la prochaine relance programmée',cls:'ok'};
+    if(s.until>Date.now())return s.appRunning?{text:`Mac maintenu éveillé jusqu’à ${A.dayClock(s.until)}`+(s.holding===false?' (en pause : batterie faible)':''),cls:'ok'}:{text:'App AI Flow injoignable : rattrapage au réveil',cls:'warn'};
+    if(s.tooFar)return {text:'Relance dans plus de 12 h : le Mac pourra dormir (rattrapage au réveil)',cls:'muted'};
+    return {text:'Prêt : app AI Flow détectée',cls:'ok'};
   }
   async function loadExtras(){
     const K=A.KEYS;
-    try{const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.drafts,K.auto]);
-      return {jobs:v[K.resume]||{},last:v[K.resumeLast]||null,drafts:Array.isArray(v[K.drafts])?v[K.drafts]:[],auto:v[K.auto]||{}};}
-    catch{return {jobs:{},last:null,drafts:[],auto:{}};}
+    try{const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.drafts,K.auto,K.history]);
+      return {jobs:v[K.resume]||{},last:v[K.resumeLast]||null,drafts:Array.isArray(v[K.drafts])?v[K.drafts]:[],history:A.cleanHistory(v[K.history]),auto:v[K.auto]||{}};}
+    catch{return {jobs:{},last:null,drafts:[],history:A.cleanHistory(null),auto:{}};}
   }
   // Toujours un onglet normal : le popup Safari est trop petit pour ces pages.
   async function openPage(page,query){
@@ -92,6 +93,10 @@
   async function openPlatform(pid){
     try{await A.request('openPlatform',{platform:pid},{timeout:2500});}
     catch{const p=A.platform(pid);if(p)try{await A.api.tabs.create({url:p.home,active:true});}catch{window.open(p.home,'_blank');}}
+    if(document.body.classList.contains('popup'))window.close();
+  }
+  async function openUrl(url){
+    try{await A.request('openUrl',{url},{timeout:2500});}catch{try{await A.api.tabs.create({url,active:true});}catch{window.open(url,'_blank');}}
     if(document.body.classList.contains('popup'))window.close();
   }
   function bindNav(rootEl){
@@ -107,5 +112,5 @@
     setInterval(refresh,ms);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   }
-  root.AIFlowUI={FAILURES,logo,meter,connection,platformCard,smartSwitchHTML,awakeText,isMac,loadExtras,openPage,openPlatform,bindNav,getDrafts,saveDrafts,live,chip};
+  root.AIFlowUI={FAILURES,logo,meter,connection,platformCard,smartSwitchHTML,awakeText,isMac,loadExtras,openPage,openPlatform,openUrl,bindNav,getDrafts,saveDrafts,live,chip};
 })(window);

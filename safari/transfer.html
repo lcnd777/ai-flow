@@ -1,32 +1,46 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Transfert — AI Flow</title><link rel="stylesheet" href="ui.css"></head>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Continuité — AI Flow</title><link rel="stylesheet" href="ui.css"></head>
 <body class="page">
   <header class="page-top">
-    <div class="brand"><span class="mark" aria-hidden="true"></span><div><b>AI Flow</b><small>Transfert de contexte</small></div></div>
+    <div class="brand"><span class="mark" aria-hidden="true"></span><div><b>AI Flow</b><small>Transfert et points de reprise</small></div></div>
     <nav class="page-nav" aria-label="Pages AI Flow">
       <button type="button" data-open-page="dashboard" class="ghost">Tableau de bord</button>
       <button type="button" data-open-page="options" class="ghost">Paramètres</button>
     </nav>
   </header>
   <main class="page-main">
-    <section class="hero"><h1>Continue ailleurs, sans perdre le fil.</h1>
-      <p class="lead">Résume ton travail en quelques champs : AI Flow en fait un message de reprise clair pour l’autre IA. Rien n’est lu dans tes conversations : seul le texte que tu sélectionnes ou écris ici est utilisé, et rien n’est envoyé sans ton clic.</p></section>
+    <section class="hero"><h1 id="page-title">Continue ailleurs, sans perdre le fil.</h1>
+      <p class="lead">AI Flow prépare un message de reprise : l’essentiel de ton travail et les derniers échanges, dans l’ordre. Tu relis et modifies tout avant l’envoi. Rien n’est lu sans ton clic, rien n’est envoyé à ta place.</p></section>
+
+    <section id="source" class="panel source-card" hidden>
+      <div class="sec-head"><h2>Conversation récupérée</h2><button type="button" id="drop-capture" class="ghost small">Ne pas l’utiliser</button></div>
+      <p id="source-info" class="fine"></p>
+      <div class="modes inline-modes" role="radiogroup" aria-label="Contenu à transférer">
+        <label class="mode"><input type="radio" name="mode" value="resume" checked><div><b>Résumé de reprise + derniers échanges</b><span>Recommandé : l’objectif, tes notes et la fin de la conversation.</span></div></label>
+        <label class="mode"><input type="radio" name="mode" value="full"><div><b>Conversation complète</b><span>Tous les messages, dans la limite de taille choisie.</span></div></label>
+      </div>
+      <label class="inline">Taille maximale <select id="budget"><option value="15000">Courte (~15 000 caractères)</option><option value="40000" selected>Standard (~40 000)</option><option value="100000">Longue (~100 000)</option></select></label>
+    </section>
+
     <div class="two-col">
       <form id="form" class="panel" autocomplete="off">
         <div class="row2">
-          <label>Depuis<select id="source"></select></label>
+          <label>Depuis<select id="source-platform"></select></label>
           <label>Vers<select id="target"></select></label>
         </div>
         <p id="target-state" class="fine"></p>
-        <label>Titre de la reprise<input id="title" maxlength="80" placeholder="Ex. : Refonte de la page tarifs"></label>
+        <label>Nom du travail<input id="title" maxlength="100" placeholder="Ex. : Refonte de la page tarifs"></label>
+        <p class="fine" id="prefill-note" hidden>Champs pré-remplis à partir de la conversation (ta 1re et ta dernière demande) : vérifie-les et complète décisions et contraintes.</p>
         <div id="fields"></div>
-        <p class="fine"><span id="count">0</span> / 100 000 caractères · Vérifie et retire les informations sensibles avant de copier.</p>
       </form>
       <section class="panel preview">
-        <div class="sec-head"><h2>Aperçu du message</h2><button type="button" id="regen" class="ghost small" hidden>Régénérer depuis les champs</button></div>
-        <textarea id="preview" spellcheck="true" aria-label="Aperçu modifiable du message de reprise" placeholder="Remplis au moins un champ : l’aperçu apparaît ici et reste modifiable."></textarea>
+        <div class="sec-head"><h2>Message de reprise</h2><button type="button" id="regen" class="ghost small" hidden>Régénérer</button></div>
+        <textarea id="preview" spellcheck="true" aria-label="Message de reprise modifiable" placeholder="Récupère une conversation depuis la fenêtre AI Flow ou remplis au moins un champ."></textarea>
+        <p class="fine"><span id="count">0</span> caractères · retire les informations sensibles avant l’envoi.</p>
+        <label class="mini-check"><input type="checkbox" id="auto-insert" checked> Insérer automatiquement dans la zone de saisie (sans l’envoyer)</label>
         <div class="row-actions">
-          <button type="button" id="copy" class="primary">Copier et ouvrir</button>
-          <button type="button" id="save" class="ghost">Enregistrer comme reprise</button>
+          <button type="button" id="go" class="primary">Ouvrir et insérer</button>
+          <button type="button" id="copy" class="ghost">Copier</button>
+          <button type="button" id="save" class="ghost">Enregistrer le point de reprise</button>
           <button type="button" id="reset" class="ghost">Effacer</button>
         </div>
         <p id="status" class="fine" role="status"></p>

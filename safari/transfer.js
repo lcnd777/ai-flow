@@ -1,85 +1,125 @@
 (async function(){
   'use strict';
-  const A=window.AIFlow,U=window.AIFlowUI,$=id=>document.getElementById(id),esc=A.escapeHTML;
-  const MAX=100000,K=A.KEYS;
-  const HINTS={goal:'Ce que tu cherches à obtenir, en une ou deux phrases.',context:'Projet, public, technologies, liens utiles…',decisions:'Ce qui est déjà tranché et ne doit pas être remis en question.',
-    constraints:'Délais, ton, format, limites techniques…',done:'Ce qui est terminé.',next:'Les prochaines étapes, dans l’ordre.',excerpt:'Colle ici un extrait utile (code, réponse, plan…).'};
-  const chats=A.PLATFORMS.filter(p=>p.chat||p.id==='codex');
-  let state=await A.getState(),draftId=null,manual=false;
-  $('fields').innerHTML=A.HANDOFF_FIELDS.map(([k,label])=>`<label>${esc(label)}<textarea data-field="${k}" rows="${k==='excerpt'?6:3}" placeholder="${esc(HINTS[k])}"></textarea></label>`).join('');
-  const opts=chats.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  $('source').innerHTML='<option value="">—</option>'+opts;$('target').innerHTML=opts;
-  const fields=()=>Object.fromEntries([...document.querySelectorAll('[data-field]')].map(t=>[t.dataset.field,t.value]));
+  const A=window.AIFlow,U=window.AIFlowUI,$=id=>document.getElementById(id),esc=A.escapeHTML,K=A.KEYS;
+  const HINTS={goal:'Ce que tu cherches à obtenir.',context:'Projet, public, technologies, liens utiles…',decisions:'Ce qui est déjà tranché et ne doit pas être remis en question.',
+    constraints:'Délais, ton, format, limites techniques…',done:'Ce qui est terminé.',next:'Les prochaines étapes, dans l’ordre.',excerpt:'Un extrait précis à transmettre tel quel (code, plan…).'};
+  const DEST=['claude','chatgpt'];
+  let state=await A.getState(),capture=null,draftId=null,manual=false;
   const name=id=>A.platform(id)?.name||'';
-  function suggestTarget(){
-    const sw=A.smartSwitch(state,Date.now(),$('source').value||null);
-    const best=sw.available.find(s=>A.platform(s.platform).chat||s.platform==='codex');
-    if(best&&best.platform!==$('source').value)return best.platform;
-    return $('source').value==='claude'?'chatgpt':'claude';
+  $('fields').innerHTML=A.HANDOFF_FIELDS.map(([k,label])=>`<label>${esc(label)}<textarea data-field="${k}" rows="${k==='excerpt'?4:3}" placeholder="${esc(HINTS[k])}"></textarea></label>`).join('');
+  $('source-platform').innerHTML='<option value="">—</option>'+['claude','chatgpt','codex'].map(id=>`<option value="${id}">${esc(name(id))}</option>`).join('');
+  $('target').innerHTML=DEST.map(id=>`<option value="${id}">${esc(name(id))}</option>`).join('');
+  const fields=()=>Object.fromEntries([...document.querySelectorAll('[data-field]')].map(t=>[t.dataset.field,t.value]));
+  const mode=()=>document.querySelector('input[name="mode"]:checked')?.value||'resume';
+
+  function transcript(){
+    if(!capture)return '';
+    const names={user:'Moi',assistant:name(capture.platform)||'Assistant'};
+    return A.buildTranscript(capture.messages,Number($('budget').value),names);
+  }
+  function compose(){
+    const tr=transcript();
+    if(capture&&mode()==='full')return {text:`Voici une conversation commencée sur ${name(capture.platform)}. Reprends-la là où elle s’est arrêtée.\n\n${tr.text}\n\nConfirme d’abord en une phrase ce que tu as compris, puis continue.`,tr};
+    return {text:A.buildHandoff(fields(),name($('source-platform').value),name($('target').value),tr?.text||''),tr};
   }
   function targetState(){
-    const t=$('target').value,st=A.platformStatus(state,t),c=U.connection(state,t,{});
-    $('target-state').textContent=st.level==='unmeasured'?`${name(t)} : quotas non mesurés, capacité inconnue.`:st.fresh.length?`${name(t)} : ${Math.round(st.worst)} % utilisés · ${A.updatedText(st.updatedAt)}.`:`${name(t)} : ${c.text}.`;
+    const t=$('target').value,pid=t==='chatgpt'?'codex':t,st=A.platformStatus(state,pid);
+    $('target-state').textContent=t==='chatgpt'?'Limites de messages ChatGPT non mesurables.'+(st.fresh.length?` Codex : ${Math.round(st.worst)} % utilisés.`:''):st.fresh.length?`${name(t)} : ${Math.round(st.worst)} % utilisés · ${A.updatedText(st.updatedAt)}.`:`${name(t)} : quota inconnu (aucun relevé récent).`;
+    $('go').textContent=`Ouvrir ${name(t)}${$('auto-insert').checked?' et insérer':''}`;
   }
   function update(){
-    if(!manual)$('preview').value=A.buildHandoff(fields(),name($('source').value),name($('target').value));
+    const {text,tr}=compose();
+    if(!manual)$('preview').value=text;
     $('count').textContent=$('preview').value.length.toLocaleString('fr-FR');
-    $('copy').textContent=`Copier et ouvrir ${name($('target').value)}`;
+    if(capture&&tr)$('source-info').textContent=`« ${capture.title} » · ${name(capture.platform)} · ${capture.messages.length} messages${tr.omitted?` · ${tr.included} repris, ${tr.omitted} intermédiaires omis pour tenir dans la taille choisie`:' · tous repris'}${capture.source==='page'?' · lus depuis la page affichée (les messages non chargés peuvent manquer)':''}.`;
     targetState();
   }
   function fill(d){
     draftId=d.id||null;$('title').value=d.title||'';
-    if(d.source)$('source').value=d.source;
-    if(d.target)$('target').value=d.target;
+    if(d.source)$('source-platform').value=d.source;
+    if(d.target&&DEST.includes(d.target))$('target').value=d.target;
     for(const t of document.querySelectorAll('[data-field]'))t.value=d.fields?.[t.dataset.field]||'';
-    manual=!!d.preview&&d.preview!==A.buildHandoff(d.fields||{},name(d.source),name(d.target));
+    manual=!!d.preview&&d.preview!==compose().text;
     if(manual)$('preview').value=d.preview;
     $('regen').hidden=!manual;
   }
-  // Préremplissage : une reprise enregistrée, ou la sélection envoyée par la pastille (usage unique).
-  const params=new URLSearchParams(location.search);
-  const drafts=await U.getDrafts();
-  const draft=params.get('draft')&&drafts.find(d=>d.id===params.get('draft'));
-  if(draft){fill(draft);$('status').textContent='Reprise chargée.';}
-  else{
-    try{
-      const seed=(await A.api.storage.local.get(K.seed))[K.seed];
-      await A.api.storage.local.remove(K.seed);
-      if(seed&&Date.now()-seed.ts<10*60000){
-        if(A.platform(seed.source))$('source').value=seed.source;
-        if(typeof seed.text==='string'&&seed.text.trim())document.querySelector('[data-field="excerpt"]').value=seed.text.slice(0,20000);
-      }
-    }catch{}
-    if(params.get('from')&&A.platform(params.get('from')))$('source').value=params.get('from');
-    const to=params.get('to');
-    $('target').value=to&&A.platform(to)&&to!==$('source').value?to:suggestTarget();
+  function useCapture(c){
+    capture=c;$('source').hidden=false;
+    $('source-platform').value=c.platform;
+    $('target').value=c.platform==='claude'?'chatgpt':'claude';
+    if(!$('title').value)$('title').value=c.title||'';
+    const pre=A.prefillFromMessages(c.messages);
+    for(const [k,v] of Object.entries(pre)){const el=document.querySelector(`[data-field="${k}"]`);if(el&&!el.value)el.value=v;}
+    $('prefill-note').hidden=false;
   }
+  // Entrées possibles : capture faite sur clic (popup / pastille), point de reprise existant, ou sélection.
+  const params=new URLSearchParams(location.search);
+  const drafts=A.cleanCheckpoints(await U.getDrafts());
+  try{
+    const v=await A.api.storage.local.get([K.capture,K.seed]);
+    await A.api.storage.local.remove([K.capture,K.seed]);
+    const c=v[K.capture];
+    if(params.get('capture')&&c&&Date.now()-c.ts<10*60000&&Array.isArray(c.messages)&&c.messages.length)useCapture(c);
+    const seed=v[K.seed];
+    if(seed&&Date.now()-seed.ts<10*60000&&typeof seed.text==='string'&&seed.text.trim()){
+      if(A.platform(seed.source))$('source-platform').value=seed.source;
+      document.querySelector('[data-field="excerpt"]').value=seed.text.slice(0,20000);
+    }
+  }catch{}
+  const draft=params.get('draft')&&drafts.find(d=>d.id===params.get('draft'));
+  if(draft){fill(draft);$('status').textContent=draft.kind==='interruption'?'Travail interrompu retrouvé : complète le contexte puis reprends-le ici ou sur une autre IA.':'Point de reprise chargé.';}
+  if(!capture&&!draft){
+    if(params.get('from')&&A.platform(params.get('from')))$('source-platform').value=params.get('from');
+    const to=params.get('to');if(DEST.includes(to)&&to!==$('source-platform').value)$('target').value=to;
+    else $('target').value=$('source-platform').value==='claude'?'chatgpt':'claude';
+  }
+  if(params.get('mode')==='checkpoint'){$('page-title').textContent='Point de reprise';$('title').focus();}
+
   $('form').addEventListener('input',update);$('form').addEventListener('change',update);
+  for(const r of document.querySelectorAll('input[name="mode"]'))r.addEventListener('change',()=>{manual=false;$('regen').hidden=true;update();});
+  $('budget').addEventListener('change',()=>{manual=false;$('regen').hidden=true;update();});
+  $('auto-insert').addEventListener('change',targetState);
   $('preview').addEventListener('input',()=>{manual=true;$('regen').hidden=false;$('count').textContent=$('preview').value.length.toLocaleString('fr-FR');});
   $('regen').onclick=()=>{manual=false;$('regen').hidden=true;update();};
-  function record(){
-    const now=Date.now(),f=fields(),title=$('title').value.trim()||f.goal.trim().split('\n')[0].slice(0,60)||'Reprise du '+A.dayClock(now);
-    return {id:draftId||String(now),title,source:$('source').value||null,target:$('target').value,fields:f,preview:$('preview').value,createdAt:drafts.find(d=>d.id===draftId)?.createdAt||now,updatedAt:now};
+  $('drop-capture').onclick=()=>{capture=null;$('source').hidden=true;$('prefill-note').hidden=true;manual=false;update();};
+
+  function record(kind='checkpoint'){
+    const now=Date.now(),f=fields(),old=drafts.find(d=>d.id===draftId);
+    const title=$('title').value.trim()||f.goal.trim().split('\n')[0].slice(0,60)||'Point de reprise du '+A.dayClock(now);
+    return {id:draftId||String(now),kind:old?.kind||kind,title,source:$('source-platform').value||null,platform:old?.platform||null,
+      url:capture?.url||old?.url||null,target:$('target').value,fields:f,preview:$('preview').value,createdAt:old?.createdAt||now,updatedAt:now,resetAt:old?.resetAt||null,status:old?.status||'open'};
   }
-  $('save').onclick=async()=>{
-    if(!$('preview').value.trim()){$('status').textContent='Rien à enregistrer pour l’instant.';return;}
-    const r=record(),list=(await U.getDrafts()).filter(d=>d.id!==r.id);
-    draftId=r.id;await U.saveDrafts([r,...list]);
-    $('status').textContent='Reprise enregistrée sur cet appareil. Retrouve-la dans la fenêtre AI Flow ou le tableau de bord.';
-  };
-  $('reset').onclick=()=>{if(!confirm('Effacer le formulaire ? (Les reprises enregistrées sont conservées.)'))return;fill({});manual=false;$('regen').hidden=true;update();$('status').textContent='';};
+  async function saveCheckpoint(silent){
+    if(!$('preview').value.trim()&&!$('title').value.trim()){if(!silent)$('status').textContent='Rien à enregistrer pour l’instant.';return null;}
+    const r=record(),list=A.cleanCheckpoints(await U.getDrafts()).filter(d=>d.id!==r.id);
+    draftId=r.id;await U.saveDrafts(A.cleanCheckpoints([r,...list]));
+    if(!silent)$('status').textContent='Point de reprise enregistré sur cet appareil. Retrouve-le dans la fenêtre AI Flow et le tableau de bord.';
+    return r;
+  }
+  $('save').onclick=()=>saveCheckpoint(false);
+  $('reset').onclick=()=>{if(!confirm('Effacer le formulaire ? (Les points de reprise enregistrés sont conservés.)'))return;fill({});capture=null;$('source').hidden=true;manual=false;$('regen').hidden=true;update();$('status').textContent='';};
+  async function copy(text){
+    try{await navigator.clipboard.writeText(text);return true;}
+    catch{$('preview').focus();$('preview').select();return false;}
+  }
   $('copy').onclick=async()=>{
-    const text=$('preview').value.trim(),target=$('target').value;
-    if(!text){$('status').textContent='Remplis au moins un champ avant de copier.';return;}
-    if(text.length>MAX){$('status').textContent='Texte trop long : 100 000 caractères maximum.';return;}
+    const text=$('preview').value.trim();if(!text){$('status').textContent='Le message est vide.';return;}
+    $('status').textContent=await copy(text)?'Copié. Colle-le (⌘V) dans la nouvelle conversation et relis-le avant d’envoyer.':'Copie refusée : le texte est sélectionné, fais ⌘C.';
+  };
+  $('go').onclick=async()=>{
+    const text=$('preview').value.trim(),t=$('target').value;
+    if(!text){$('status').textContent='Le message est vide.';return;}
+    if(text.length>200000){$('status').textContent='Message trop long : réduis la taille maximale.';return;}
+    const copied=await copy(text);
+    if(draftId||capture)await saveCheckpoint(true);
+    const btn=$('go');btn.disabled=true;$('status').textContent=`Ouverture de ${name(t)}…`;
     try{
-      await navigator.clipboard.writeText(text);
-      $('status').textContent=`Copié. Colle-le dans ${name(target)} (⌘V), relis-le puis envoie-le toi-même.`;
-      await U.openPlatform(target);
-    }catch{
-      $('preview').focus();$('preview').select();
-      $('status').textContent='Copie automatique refusée par le navigateur : le texte est sélectionné, utilise ⌘C puis ouvre la destination.';
-    }
+      const r=await A.request('openAndInsert',{platform:t,text,insert:$('auto-insert').checked},{timeout:30000});
+      $('status').textContent=r.status==='inserted'?`Inséré dans ${name(t)}. Relis puis envoie toi-même.`
+        :r.status==='opened'?`${name(t)} est ouvert. ${copied?'Colle le message (⌘V)':'Copie le message'} puis envoie-le.`
+        :`${name(t)} est ouvert, mais l’insertion automatique n’a pas fonctionné${r.status==='draft'?' (un brouillon était déjà présent)':''}. ${copied?'Le message est copié : colle-le (⌘V).':'Copie le message puis colle-le.'} [${r.status}]`;
+    }catch(e){$('status').textContent=e.message;}
+    finally{btn.disabled=false;}
   };
   U.bindNav(document);update();
   U.live(async()=>{state=await A.getState();targetState();},60000);

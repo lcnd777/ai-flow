@@ -4,11 +4,14 @@
   - pourcentages, dates de reset et libellés de quota ;
   - diagnostics : statut et code HTTP, jamais de réponse brute ;
   - réglages ;
-  - reprises de travail que tu enregistres volontairement ;
+  - historique de consommation des 7 derniers jours (pourcentages horodatés uniquement) ;
+  - points de reprise que tu enregistres volontairement (ils peuvent contenir des extraits de conversation que tu as relus) ;
+  - travaux interrompus par une limite : titre et lien de la conversation, sans son contenu ;
   - relances programmées (URL de la conversation et message choisi) ;
   - un identifiant d'organisation Claude et une empreinte courte du compte Codex, pour ne jamais mélanger deux comptes.
-- **Jamais stocké** : mot de passe, cookie, jeton de session, contenu de conversation.
+- **Jamais stocké** : mot de passe, cookie, jeton de session.
+- **Contenu des conversations** : lu uniquement sur ton clic (« Transférer cette conversation », « Point de reprise »), pour l’onglet affiché seulement. Il reste en mémoire de la page de transfert et n’est conservé que si tu enregistres un point de reprise. AI Flow ne parcourt jamais tes autres conversations.
 - **Jamais transmis** à un serveur AI Flow : il n'y en a pas. Les seules requêtes réseau sont les lectures de quota, faites par ton propre onglet vers la plateforme elle-même.
-- **Transfert** : seul le texte que tu sélectionnes (au clic sur « Transférer ») ou que tu écris est utilisé. La copie passe par ton presse-papiers, et rien n'est envoyé à l'autre IA sans ton action.
+- **Transfert** : le message est copié dans ton presse-papiers et, si tu le choisis, inséré dans la zone de saisie de l’autre IA, **sans jamais être envoyé** à ta place.
 - **App Mac** : elle reçoit seulement l'heure de fin du maintien éveillé et le texte des notifications. Le lien local `aiflow://` ne sort pas du Mac.
 - **Effacement** : Paramètres › Données (relevés, historique). Les reprises se suppriment depuis le tableau de bord. Désinstaller l'extension efface tout.
