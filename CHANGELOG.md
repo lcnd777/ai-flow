@@ -1,3 +1,9 @@
+## 0.12.1 — Corrections après test sur Mac
+
+- **Transfert : les deux modes sont toujours visibles.** Si la page d’origine n’est pas une conversation lisible (par exemple une session **Claude Code**), la page de transfert explique pourquoi et propose les conversations Claude/ChatGPT ouvertes dans Safari : un clic les récupère. Une erreur de lecture est maintenant affichée au lieu d’être ignorée.
+- **Barre de menus macOS : diagnostic.** Paramètres › Version et mises à jour › « Barre de menus macOS » indique le dernier envoi (réussi, app fermée, pas de réponse) avec un bouton « Envoyer les quotas maintenant ». Après un échec, l’envoi est retenté au relevé suivant (au lieu d’attendre 10 min). Le menu ⚡ affiche l’heure de la dernière réception.
+- **Tableau de bord : les cartes des plateformes occupent toute la largeur.**
+
 ## 0.12.0 — Smart Transfer 2.0, Flow Checkpoints, Flow Recovery, quotas dans la barre de menus
 
 ### Nouveau

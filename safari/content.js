@@ -166,7 +166,7 @@
   async function checkpointNow(){
     // Sur ce clic uniquement : lecture de la conversation ouverte, puis édition du point de reprise.
     try{await send('captureConversation',{});await send('openPage',{page:'transfer',query:{capture:'1',mode:'checkpoint'}});}
-    catch{send('openPage',{page:'transfer',query:{mode:'checkpoint',from:site}}).catch(()=>{});}
+    catch(e){send('openPage',{page:'transfer',query:{mode:'checkpoint',from:site,why:'err',err:String(e?.message||'').slice(0,180)}}).catch(()=>{});}
   }
   function switchBlock(){
     const sw=A.smartSwitch(state,Date.now(),main);
@@ -208,11 +208,14 @@
     // Sur ce clic uniquement : la sélection si tu en as fait une, sinon la conversation ouverte.
     const text=String(window.getSelection?.()?.toString()||'').slice(0,20000);
     const dest=to||(site==='claude'?'chatgpt':'claude');
+    let why=text.trim()?'':/^\/code(\/|$)/.test(location.pathname)?'code':'notconv',err='';
     if(!text.trim()&&PL.conversationOf(location.href)){
-      try{await send('captureConversation',{});await send('openPage',{page:'transfer',query:{capture:'1',to:dest}});return;}catch{}
+      try{await send('captureConversation',{});await send('openPage',{page:'transfer',query:{capture:'1',to:dest}});return;}
+      catch(e){why='err';err=String(e?.message||'').slice(0,180);}
     }
     try{await A.api.storage.local.set({[K.seed]:{text,source:site,ts:Date.now()}});}catch{}
-    send('openPage',{page:'transfer',query:{from:site,to:dest}}).catch(()=>{});
+    const query={from:site,to:dest};if(why)query.why=why;if(err)query.err=err;
+    send('openPage',{page:'transfer',query}).catch(()=>{});
   }
   const $=id=>root.getElementById(id);
   function bind(){

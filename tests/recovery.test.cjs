@@ -94,3 +94,25 @@ test('barre de menus macOS : résumé fidèle, envoyé seulement s’il change, 
   const sent=fb.native.filter(m=>m.type==='AI_FLOW_SNAPSHOT');
   assert.equal(sent.length,1);assert.ok(!JSON.stringify(sent[0]).match(/messages|text/));
 });
+test('barre de menus : après un échec (app fermée), renvoi au relevé suivant et état lisible',async()=>{
+  const now=Date.now();let running=false;
+  const {fb,T,call}=bg({native:true,nativeReply:m=>m.type==='AI_FLOW_SNAPSHOT'?(running?{ok:true,appRunning:true}:{ok:false,error:'app-not-running',appRunning:false}):{ok:true}});
+  fb.store.ai_flow_state_v1={metrics:{'claude.session':{percent:42,source:'observed',observedAt:now,resetAt:now+H}}};
+  const r1=await T.syncMenuBar();assert.equal(r1.ok,false);assert.equal(r1.error,'app-not-running');
+  assert.equal((await T.menuBarStatus()).error,'app-not-running');
+  running=true;
+  const r2=await T.syncMenuBar();assert.equal(r2.sent,true,'données inchangées mais échec précédent : renvoi');assert.equal(r2.ok,true);
+  const st=(await call('menuBarStatus')).value;assert.equal(st.ok,true);assert.equal(st.platforms,1);assert.equal(st.error,null);
+  assert.equal((await call('menuBarSync')).value.sent,true,'envoi forcé depuis les Paramètres');
+});
+test('liste des conversations ouvertes : uniquement Claude/ChatGPT, et refusée depuis une page web',async()=>{
+  const {fb,call}=bg();
+  fb.addTab('https://claude.ai/chat/abc',{title:'Tarifs - Claude'});
+  fb.addTab('https://claude.ai/code/session_1',{title:'Claude Code'});
+  fb.addTab('https://chatgpt.com/c/xyz',{title:'Plan - ChatGPT'});
+  fb.addTab('https://example.com/',{title:'Autre'});
+  const list=(await call('conversationTabs')).value;
+  assert.deepEqual(JSON.parse(JSON.stringify(list.map(t=>[t.platform,t.title]))),[['claude','Tarifs'],['chatgpt','Plan']]);
+  const tab=fb.addTab('https://claude.ai/chat/abc',{title:'x'});
+  assert.equal((await fb.send({type:'AI_FLOW',op:'conversationTabs'},{id:'ext',url:'https://claude.ai/chat/abc',tab:{id:tab.id,url:'https://claude.ai/chat/abc'},frameId:0})).ok,false);
+});

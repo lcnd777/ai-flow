@@ -151,6 +151,8 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   await dash.mouse.move(5,5);
   await dash.locator('#refresh').click();await dash.waitForFunction(()=>document.getElementById('refresh').textContent==='Actualiser',null,{timeout:15000}).catch(()=>{});
   check('Tableau de bord : « Actualiser » fonctionne et revient à l’état normal',(await dash.locator('#refresh').innerText())==='Actualiser'&&await dash.locator('#refresh').isEnabled());
+  const fill=await dash.evaluate(()=>{const g=document.getElementById('platforms'),cards=[...g.children];return {n:cards.length,used:cards.reduce((a,c)=>a+c.getBoundingClientRect().width,0)+12*(cards.length-1),total:g.getBoundingClientRect().width};});
+  check('Tableau de bord : les cartes des plateformes occupent toute la largeur',fill.n>=2&&Math.abs(fill.used-fill.total)<4,JSON.stringify(fill));
   await dash.screenshot({path:path.join(shots,'dashboard.png'),fullPage:true});
   const toasts=await storage('ai_flow_toast_v1');
   check('Notification « approche de sa limite » une seule fois',(toasts||[]).filter(t=>t.type==='approaching'&&t.platform==='claude').length===1,JSON.stringify(toasts));
@@ -246,6 +248,18 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     const inserted=await pg.evaluate(()=>document.querySelector('.ProseMirror')?.textContent||'');
     check('Transfert : message inséré dans la zone de saisie de ChatGPT, sans envoi',ins?.status==='inserted'&&/Je reprends avec toi un travail commencé sur Claude/.test(inserted)&&!(await pg.title()).startsWith('SENT'),JSON.stringify(ins));
     if(dest)await dest.close();
+  }
+  // 7 bis. Transfert ouvert sans conversation (ex. Claude Code) : modes visibles, raison expliquée, conversations ouvertes proposées.
+  {
+    const t2=await ctx.newPage();await t2.goto(E('transfer.html?from=claude&why=code'));await t2.waitForTimeout(1200);
+    check('Transfert sans conversation : modes visibles (désactivés) et raison expliquée',
+      await t2.locator('input[name="mode"][value="full"]').isVisible()&&await t2.locator('input[name="mode"][value="full"]').isDisabled()&&/Claude Code/.test(await t2.locator('#pick-why').innerText()));
+    const pick=t2.locator('#pick-list [data-tab]').first();
+    check('Transfert sans conversation : conversation Claude ouverte proposée',await pick.count()>0&&/Claude/.test(await pick.innerText()));
+    if(await pick.count()){await pick.click();await t2.waitForTimeout(2500);}
+    check('Transfert : conversation récupérée depuis la page, modes activés',/3 messages/.test(await t2.locator('#source-info').innerText())&&!(await t2.locator('input[name="mode"][value="full"]').isDisabled()));
+    await t2.setViewportSize({width:1200,height:900});await t2.screenshot({path:path.join(shots,'transfer-pick.png'),fullPage:true});
+    await t2.close();
   }
   const pop2=await ctx.newPage();await pop2.setViewportSize({width:380,height:600});await pop2.goto(E('popup.html'));await pop2.waitForTimeout(1200);
   check('Popup : points de reprise et travail interrompu accessibles',/point(s)? de reprise/i.test(await pop2.locator('body').innerText()));

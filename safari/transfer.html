@@ -11,15 +11,22 @@
     <section class="hero"><h1 id="page-title">Continue ailleurs, sans perdre le fil.</h1>
       <p class="lead">AI Flow prépare un message de reprise : l’essentiel de ton travail et les derniers échanges, dans l’ordre. Tu relis et modifies tout avant l’envoi. Rien n’est lu sans ton clic, rien n’est envoyé à ta place.</p></section>
 
-    <section id="source" class="panel source-card" hidden>
-      <div class="sec-head"><h2>Conversation récupérée</h2><button type="button" id="drop-capture" class="ghost small">Ne pas l’utiliser</button></div>
+    <section id="source" class="panel source-card">
+      <div class="sec-head"><h2 id="source-head">Conversation à transférer</h2><button type="button" id="drop-capture" class="ghost small" hidden>Ne pas l’utiliser</button></div>
+      <div id="pick" hidden>
+        <p id="pick-why" class="fine warn" role="status"></p>
+        <p class="fine">Choisis une conversation ouverte dans Safari : AI Flow la lit maintenant, sur ce clic uniquement.</p>
+        <div id="pick-list" class="pick-list"></div>
+        <button type="button" id="pick-refresh" class="ghost small">Actualiser la liste</button>
+      </div>
       <p id="source-info" class="fine"></p>
       <p id="attach-note" class="fine warn" hidden></p>
       <div class="modes inline-modes" role="radiogroup" aria-label="Contenu à transférer">
         <label class="mode"><input type="radio" name="mode" value="resume" checked><div><b>Continuité intelligente</b><span>Recommandé : objectif, décisions, contraintes, travail fait, problèmes et prochaines étapes, extraits automatiquement, plus les derniers échanges.</span></div></label>
         <label class="mode"><input type="radio" name="mode" value="full"><div><b>Transfert complet</b><span>Tous les messages dans l’ordre (dans la limite de taille) ; l’IA de destination fait elle-même la synthèse avant de continuer.</span></div></label>
       </div>
-      <label class="inline">Taille maximale <select id="budget"><option value="15000">Courte (~15 000 caractères)</option><option value="40000" selected>Standard (~40 000)</option><option value="100000">Longue (~100 000)</option></select></label>
+      <p id="mode-note" class="fine" hidden>Les deux modes s’activent dès qu’une conversation est récupérée. Sans conversation, le message est construit à partir des champs ci-dessous.</p>
+      <label class="inline" id="budget-row">Taille maximale <select id="budget"><option value="15000">Courte (~15 000 caractères)</option><option value="40000" selected>Standard (~40 000)</option><option value="100000">Longue (~100 000)</option></select></label>
     </section>
 
     <div class="two-col">

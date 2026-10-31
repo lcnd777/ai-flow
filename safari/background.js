@@ -311,10 +311,26 @@ async function syncMenuBar(force=false){
   const state=await A.getState(),now=Date.now(),snap=A.menuSnapshot(state,now);
   const sig=JSON.stringify(snap.platforms),last=await load(MENU_SYNC,{});
   // Envoi seulement si les données ont changé (ou toutes les 10 min, pour l'indication de fraîcheur).
-  if(!force&&last.sig===sig&&now-(last.at||0)<10*60000)return {sent:false,reason:'unchanged'};
+  // Après un échec (app fermée, pas de réponse), on réessaie au prochain relevé au lieu d'attendre 10 min.
+  if(!force&&last.ok&&last.sig===sig&&now-(last.at||0)<10*60000)return {sent:false,reason:'unchanged'};
   const reply=await nativeCall({type:'AI_FLOW_SNAPSHOT',snapshot:snap});
-  await save(MENU_SYNC,{sig,at:now,ok:!!reply?.ok});
-  return {sent:true,ok:!!reply?.ok};
+  const ok=!!reply?.ok,error=ok?null:!reply?'no-reply':reply.error==='app-not-running'||reply.appRunning===false?'app-not-running':String(reply.error||'refused').slice(0,40);
+  const rec={sig,at:now,ok,error,platforms:snap.platforms.filter(p=>p.metrics.length).length};
+  await save(MENU_SYNC,rec);
+  return {sent:true,ok,error,at:now,platforms:rec.platforms};
+}
+async function menuBarStatus(){
+  const last=await load(MENU_SYNC,{});
+  return {native:hasNative(),at:last.at||null,ok:!!last.ok,error:last.error||null,platforms:last.platforms??null};
+}
+// Onglets de conversation ouverts (Claude, ChatGPT) : adresse et titre seulement, pour choisir quoi récupérer.
+async function conversationTabs(){
+  const out=[];
+  for(const t of await allTabs()){
+    const conv=PL.conversationOf(t.url||'');
+    if(conv&&['claude','chatgpt'].includes(conv.platform))out.push({tabId:t.id,platform:conv.platform,title:cleanTitle(t.title||'').slice(0,120),active:!!t.active});
+  }
+  return out.slice(0,20);
 }
 
 /* ---------- Awake : maintien éveillé du Mac via l'app AI Flow ---------- */
@@ -482,6 +498,9 @@ async function handle(message,sender){
     case 'captureConversation':return captureConversation(origin==='page'?Number(payload?.tabId):sender.tab.id);
     case 'openAndInsert':return openAndInsert(payload?.platform,payload?.text,payload?.insert!==false,payload?.checkpointId);
     case 'connectionStatuses':return connectionStatuses();
+    case 'menuBarSync':if(origin!=='page')throw Error('Origine non autorisée');return syncMenuBar(true);
+    case 'menuBarStatus':return menuBarStatus();
+    case 'conversationTabs':if(origin!=='page')throw Error('Origine non autorisée');return conversationTabs();
     case 'refresh':return autoRefresh(PL.ids(),true);
     case 'autoRefresh':{
       const pids=origin==='page'?PL.ids():PL.forUrl(sender.url);
@@ -512,7 +531,7 @@ async function handle(message,sender){
     default:throw Error('Commande inconnue');
   }
 }
-const DIRECT_OPS=new Set(['devInfo','devCheckUpdate','reload','exportData','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert']);
+const DIRECT_OPS=new Set(['devInfo','devCheckUpdate','reload','exportData','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert','menuBarStatus','conversationTabs']);
 api.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message?.type!=='AI_FLOW')return false;
   // Ouvertures d'onglets et lectures : immédiates, sans attendre la file des écritures.
@@ -548,4 +567,4 @@ async function catchUp(){
 }
 api.runtime.onStartup?.addListener(()=>serial(async()=>{await install();await catchUp();}));
 serial(install);
-if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,linkDestination,syncMenuBar,exportData,importData,devInfo,captureConversation,recordInterruptions});
+if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,linkDestination,syncMenuBar,menuBarStatus,conversationTabs,exportData,importData,devInfo,captureConversation,recordInterruptions});

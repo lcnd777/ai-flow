@@ -65,7 +65,7 @@
       await U.openPage('transfer',kind==='checkpoint'?{capture:'1',mode:'checkpoint'}:{capture:'1'});
     }catch(e){
       busy=e.message;render();
-      if(kind==='checkpoint')await U.openPage('transfer',{mode:'checkpoint',from:active.site});
+      await U.openPage('transfer',{...(kind==='checkpoint'?{mode:'checkpoint'}:{}),from:active.site,why:'err',err:String(e.message||'').slice(0,180)});
     }
   }
   async function reload(){

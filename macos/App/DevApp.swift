@@ -63,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case "snapshot":
                 if let d = value("d"), let data = Data(base64URL: d), data.count < 12_000, QuotaSnapshot(data: data) != nil {
                     UserDefaults.standard.set(data, forKey: QuotaSnapshot.storeKey)
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: QuotaSnapshot.receivedKey)
                     refreshStatusItem()
                 }
             default: break
@@ -144,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Rechercher des mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "u"))
         menu.addItem(.separator())
         // Quotas Claude / Codex (mêmes données que la fenêtre de l'extension).
-        if let snap = QuotaSnapshot.load() {
+        if let snap = QuotaSnapshot.load(), !snap.platforms.isEmpty {
             for line in snap.menuLines() {
                 let item = NSMenuItem(title: line.text, action: nil, keyEquivalent: "")
                 item.isEnabled = false
@@ -152,7 +153,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 menu.addItem(item)
             }
         } else {
-            let item = NSMenuItem(title: "Quotas : ouvre Claude ou ChatGPT dans Safari", action: nil, keyEquivalent: "")
+            for text in ["Quotas : aucune donnée reçue de Safari", "   Ouvre un onglet Claude ou ChatGPT dans Safari,", "   ou AI Flow › Paramètres › « Envoyer les quotas maintenant »"] {
+                let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                menu.addItem(item)
+            }
+        }
+        let received = UserDefaults.standard.double(forKey: QuotaSnapshot.receivedKey)
+        if received > 0 {
+            let f = DateFormatter()
+            f.timeStyle = .short
+            f.dateStyle = .short
+            f.doesRelativeDateFormatting = true
+            let item = NSMenuItem(title: "Reçu de Safari : \(f.string(from: Date(timeIntervalSince1970: received)))", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         }
@@ -202,6 +215,7 @@ extension Data {
 /// Résumé envoyé par l'extension : uniquement des pourcentages lus, leurs dates et l'état. Traité comme des données.
 struct QuotaSnapshot {
     static let storeKey = "quotaSnapshot"
+    static let receivedKey = "quotaSnapshotReceivedAt"
     static let staleAfter: TimeInterval = 15 * 60
     struct Metric { let label: String; let percent: Int; let resetAt: Date?; let observedAt: Date }
     struct Platform { let name: String; let radar: String; let risk: String; let updatedAt: Date?; let metrics: [Metric] }

@@ -113,6 +113,8 @@ body.popup{width:380px;max-height:600px;display:flex;flex-direction:column;backg
 .timeline .cline button{margin-left:4px}
 .source-card .fine{margin-top:0}
 .inline-modes{grid-template-columns:1fr 1fr}
+.pick-list{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}.pick-list .pick{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mode:has(input:disabled){opacity:.55;cursor:not-allowed}
 @media(max-width:700px){.inline-modes{grid-template-columns:1fr}}
 
 /* ---------- Pages pleine taille ---------- */
@@ -123,7 +125,7 @@ body.page{min-height:100vh;background:radial-gradient(1200px 500px at 85% -10%,c
 .page-main.narrow{max-width:760px}
 .hero h1{font-size:clamp(24px,4vw,34px);letter-spacing:-.035em}
 .lead{color:var(--ink2);margin:6px 0 0;max-width:70ch;font-size:14px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
 .panel{background:var(--panel);border:1px solid var(--edge);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
 .panel>h2{margin-bottom:6px}
 .sec-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}

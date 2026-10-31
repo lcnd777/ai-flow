@@ -33,7 +33,7 @@
     const e=A.estimateTransfer($('preview').value,$('target').value),dest=name($('target').value);
     $('count').textContent=`${e.chars.toLocaleString('fr-FR')} caractères (~${e.tokens.toLocaleString('fr-FR')} jetons)`;
     const w=$('size-warn');
-    w.textContent=e.level==='ok'?'':e.level==='large'?`Volumineux pour ${dest} : le texte risque d’être converti en pièce jointe ou tronqué. Préfère « Résumé de reprise » ou une taille plus courte.`:`Trop volumineux pour ${dest} : réduis la taille maximale ou passe en « Résumé de reprise ».`;
+    w.textContent=e.level==='ok'?'':e.level==='large'?`Volumineux pour ${dest} : le texte risque d’être converti en pièce jointe ou tronqué. Préfère « Continuité intelligente » ou une taille plus courte.`:`Trop volumineux pour ${dest} : réduis la taille maximale ou passe en « Continuité intelligente ».`;
     w.className='fine '+(e.level==='ok'?'':'warn');
   }
   function update(){
@@ -52,8 +52,34 @@
     if(manual)$('preview').value=d.preview;
     $('regen').hidden=!manual;
   }
+  // Sans conversation récupérée : la section reste visible, explique pourquoi et propose les conversations ouvertes.
+  const WHY={code:'Cette page est une session Claude Code : AI Flow ne sait pas encore la lire (format différent des conversations Claude). Sélectionne le texte utile dans la page, puis clique « Transférer » dans la pastille : il arrive dans « Éléments indispensables ».',
+    notconv:'La page d’où tu viens n’est pas une conversation Claude ou ChatGPT.'};
+  function noCapture(why){
+    capture=null;$('pick').hidden=false;$('drop-capture').hidden=true;$('source-info').textContent='';$('attach-note').hidden=true;
+    $('source-head').textContent='Conversation à transférer';$('pick-why').textContent=why||'';$('pick-why').hidden=!why;
+    for(const r of document.querySelectorAll('input[name="mode"]'))r.disabled=true;
+    $('mode-note').hidden=false;$('budget').disabled=true;listTabs();
+  }
+  async function listTabs(){
+    let tabs=[];try{tabs=await A.request('conversationTabs');}catch{}
+    $('pick-list').innerHTML=tabs.length?tabs.map(t=>`<button type="button" class="ghost small pick" data-tab="${t.tabId}">${esc(name(t.platform))} · ${esc(t.title)}</button>`).join('')
+      :'<p class="fine">Aucune conversation Claude ou ChatGPT ouverte. Ouvre-en une dans un autre onglet, puis « Actualiser la liste ». Tu peux aussi remplir les champs à la main.</p>';
+    for(const b of $('pick-list').querySelectorAll('[data-tab]'))b.onclick=()=>pickTab(Number(b.dataset.tab),b);
+  }
+  async function pickTab(tabId,b){
+    b.disabled=true;$('pick-why').hidden=false;$('pick-why').textContent='Lecture de la conversation…';
+    try{
+      await A.request('captureConversation',{tabId},{timeout:20000});
+      const v=await A.api.storage.local.get(K.capture);await A.api.storage.local.remove(K.capture);
+      if(!v[K.capture]?.messages?.length)throw Error('Aucun message lisible dans cet onglet.');
+      manual=false;useCapture(v[K.capture]);update();
+    }catch(e){$('pick-why').textContent=e.message||'Lecture impossible.';b.disabled=false;}
+  }
   function useCapture(c){
-    capture=c;$('source').hidden=false;
+    capture=c;$('pick').hidden=true;$('drop-capture').hidden=false;$('mode-note').hidden=true;$('budget').disabled=false;
+    $('source-head').textContent='Conversation récupérée';
+    for(const r of document.querySelectorAll('input[name="mode"]'))r.disabled=false;
     $('source-platform').value=c.platform;
     $('target').value=c.platform==='claude'?'chatgpt':'claude';
     if(!$('title').value)$('title').value=c.title||'';
@@ -87,6 +113,7 @@
     const to=params.get('to');if(DEST.includes(to)&&to!==$('source-platform').value)$('target').value=to;
     else $('target').value=$('source-platform').value==='claude'?'chatgpt':'claude';
   }
+  if(!capture)noCapture(params.get('why')==='err'?(params.get('err')||'La conversation n’a pas pu être lue.'):WHY[params.get('why')]||'');
   if(params.get('mode')==='checkpoint'){$('page-title').textContent='Point de reprise';$('title').focus();}
 
   $('form').addEventListener('input',update);$('form').addEventListener('change',update);
@@ -96,7 +123,8 @@
   $('preview').addEventListener('input',()=>{manual=true;$('regen').hidden=false;size();});
   $('target').addEventListener('change',size);
   $('regen').onclick=()=>{manual=false;$('regen').hidden=true;update();};
-  $('drop-capture').onclick=()=>{capture=null;$('source').hidden=true;$('prefill-note').hidden=true;manual=false;update();};
+  $('drop-capture').onclick=()=>{noCapture('');$('prefill-note').hidden=true;manual=false;update();};
+  $('pick-refresh').onclick=listTabs;
 
   function record(kind='checkpoint'){
     const now=Date.now(),f=fields(),old=drafts.find(d=>d.id===draftId);
@@ -114,7 +142,7 @@
     return r;
   }
   $('save').onclick=()=>saveCheckpoint(false);
-  $('reset').onclick=()=>{if(!confirm('Effacer le formulaire ? (Les points de reprise enregistrés sont conservés.)'))return;fill({});capture=null;$('source').hidden=true;manual=false;$('regen').hidden=true;update();$('status').textContent='';};
+  $('reset').onclick=()=>{if(!confirm('Effacer le formulaire ? (Les points de reprise enregistrés sont conservés.)'))return;fill({});noCapture('');manual=false;$('regen').hidden=true;update();$('status').textContent='';};
   async function copy(text){
     try{await navigator.clipboard.writeText(text);return true;}
     catch{$('preview').focus();$('preview').select();return false;}
