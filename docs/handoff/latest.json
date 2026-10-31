@@ -1,0 +1,111 @@
+{
+  "schema": "ai-flow.handoff/v1",
+  "createdAt": "2026-10-31T23:39:18.862Z",
+  "agents": {
+    "from": "claude-code",
+    "to": "codex"
+  },
+  "project": {
+    "repository": "https://github.com/lcnd777/ai-flow",
+    "branch": "main",
+    "commit": "492cbea67edc19889867056c00ad6e283db98b48",
+    "commitSubject": "0.14.0 : Git Handoff v1 (Claude Code ↔ Codex), actions de continuité clarifiées",
+    "commitDate": "2026-10-31T23:38:58+00:00",
+    "upstream": "origin/main",
+    "environment": "Session Claude Code cloud (Linux), Node + Chromium Playwright disponibles ; pas de Safari ni de sessions authentifiées."
+  },
+  "publication": {
+    "level": "published",
+    "label": "Publié : le dépôt distant contient exactement ce commit",
+    "local": false,
+    "unpushed": false
+  },
+  "git": {
+    "ahead": 0,
+    "behind": 0,
+    "unpushedCommits": [],
+    "remoteBranchesContainingHead": [
+      "origin/main"
+    ],
+    "localChanges": [],
+    "stashes": 0,
+    "recentCommits": [
+      {
+        "sha": "492cbea",
+        "subject": "0.14.0 : Git Handoff v1 (Claude Code ↔ Codex), actions de continuité clarifiées"
+      },
+      {
+        "sha": "fb5aede",
+        "subject": "0.13.4 : fenêtre AI Flow plus large et plus haute sur Safari Mac"
+      },
+      {
+        "sha": "aded580",
+        "subject": "0.13.3 : Smart Switch affiché seulement si une autre plateforme a une capacité confirmée"
+      },
+      {
+        "sha": "49d9fb8",
+        "subject": "0.13.2 : Smart Switch masqué quand toutes les plateformes ont atteint leur limite"
+      },
+      {
+        "sha": "cdbda50",
+        "subject": "0.13.1 : Smart Switch dès qu'une autre plateforme est disponible, reprise de brouillon sans mélange, intégration des branches Codex"
+      },
+      {
+        "sha": "26f59d0",
+        "subject": "feat: show consumption across platforms with distinct colors"
+      },
+      {
+        "sha": "ebf04ca",
+        "subject": "fix: preserve sync context across stale previews and recovery"
+      },
+      {
+        "sha": "9caaf15",
+        "subject": "0.13.0 : Smart Context Sync (liaison, delta incrémental, décisions et conflits, journal, chiffrement local)"
+      }
+    ],
+    "secretsInChanges": {
+      "count": 0,
+      "types": []
+    }
+  },
+  "mission": "Mission « AI Flow — vision produit complète » : fiabiliser P0, clarifier la continuité, livrer Dev Continuity (Git Handoff v1), préparer P2 sans surdévelopper.",
+  "done": [
+    "0.14.0 publiée : Git Handoff v1 (tools/handoff, tests/handoff.test.cjs), AGENTS.md, CLAUDE.md, docs/DEV-CONTINUITY.md",
+    "Libellés de continuité : Continuer sur X / Sauvegarder pour plus tard / Synchroniser les avancées (popup, pastille, page de sauvegarde)",
+    "PR #2 fermée (contenu déjà dans main)",
+    "0.13.x : Smart Switch (alternative disponible uniquement), fenêtre 460×600, graphique multi-plateformes (Codex), fiabilité Smart Context Sync (Codex)"
+  ],
+  "notDone": [
+    "Quota Sentinel : diagnostics existants (connexion, relevé ancien) mais pas de détection dédiée « collecte inactive / réponse non reconnue » visible discrètement",
+    "Transfer Integrity : signalements existants (pièces jointes, taille, secrets, messages omis) ; pas encore de récapitulatif unique avant envoi",
+    "Intégration macOS de Git Handoff (choix d’un dossier dans l’app AI Flow Dev)",
+    "Flow Spaces, AI Match, Decision Vault étendu : documentés seulement (docs/DEV-CONTINUITY.md §5-6)"
+  ],
+  "decisions": [
+    "Git est la source de vérité ; la passation ne fait que des lectures Git, jamais de commit/push automatique",
+    "Pas de quotas dans la barre de menus tant que la communication extension → app n’est pas démontrée",
+    "Smart Switch affiché seulement si une autre plateforme a une capacité confirmée",
+    "Aucune nouvelle page principale par fonctionnalité"
+  ],
+  "constraints": [],
+  "problems": [
+    "Aucune validation sur Safari réel ni sur comptes Claude/ChatGPT authentifiés (formats d’API reproduits)",
+    "Le test e2e de l’infobulle dépendait de l’heure : corrigé (survol de la dernière tranche mesurée)"
+  ],
+  "next": [
+    "Vérifier avec l’utilisateur sur Safari Mac : libellés de continuité, Smart Switch, synchronisation réelle Claude ↔ ChatGPT",
+    "Quota Sentinel : statut discret par plateforme (collecte inactive, session expirée, réponse non reconnue) à partir de ai_flow_diagnostics_v1",
+    "Transfer Integrity : récapitulatif « ce qui part / ce qui ne part pas » au-dessus du bouton d’envoi",
+    "Intégration Git Handoff dans l’app macOS (dossier choisi explicitement)"
+  ],
+  "tests": [
+    {
+      "command": "npm test",
+      "result": "réussi",
+      "exitCode": 0,
+      "summary": "# skipped 0 | # todo 0 | # duration_ms 3162.703716"
+    }
+  ],
+  "destination": "",
+  "claims": "Les rubriques mission / fait / décisions / problèmes sont déclaratives. Seule la section git est relevée automatiquement."
+}
