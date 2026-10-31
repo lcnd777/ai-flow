@@ -152,7 +152,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const box=await dash.locator('#chart svg').boundingBox();
   await dash.mouse.move(box.x+box.width-12,box.y+box.height-40);await dash.waitForTimeout(250);
   const tipText=await dash.locator('#tip').innerText().catch(()=>'');
-  check('Historique : infobulle au survol (heure, quota, consommation, relevés réels)',await dash.locator('#tip').isVisible()&&/Claude · Session/.test(tipText)&&/Consommé/.test(tipText)&&/relevé/.test(tipText),tipText);
+  check('Historique : infobulle au survol (heure, plateformes, consommation, relevés réels)',await dash.locator('#tip').isVisible()&&/Claude/.test(tipText)&&/Codex/.test(tipText)&&/Consommé/.test(tipText)&&/relevé/.test(tipText),tipText);
   await dash.screenshot({path:path.join(shots,'dashboard-tooltip.png')});
   await dash.mouse.move(5,5);
   await dash.locator('#refresh').click();await dash.waitForFunction(()=>document.getElementById('refresh').textContent==='Actualiser',null,{timeout:15000}).catch(()=>{});
@@ -335,6 +335,13 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
       await sv.locator('div.conflict input[value="defer"]').check();await sv.waitForTimeout(200);
       check('Sync : « Reporter le choix » → décision transmise comme « À arbitrer »',!(await sv.locator('#sync-insert').isDisabled())&&/À arbitrer/.test(await sv.locator('#sync-packet').inputValue()));
       await sv.setViewportSize({width:1200,height:900});await sv.screenshot({path:path.join(shots,'sync-conflict.png'),fullPage:true});
+      // Reprise d'une synchronisation non confirmée dans la même page, après une autre capture : seul le brouillon repris compte.
+      await sv.locator('#sync-copy').click();await sv.waitForTimeout(600);
+      await sv.reload();await sv.waitForTimeout(1200);
+      await sv.locator('#sync-run').click();await sv.waitForTimeout(2000);
+      await sv.locator('#sync-open [data-act="resume"]').first().click();await sv.waitForTimeout(800);
+      check('Sync : reprise d’un brouillon après une autre capture, sans mélange avec la capture précédente',await sv.locator('#sync-items').innerHTML()===''&&await sv.locator('div.conflict').count()===0&&/À arbitrer/.test(await sv.locator('#sync-packet').inputValue())&&!(await sv.locator('#sync-insert').isDisabled()));
+      await sv.locator('#sync-cancel').click();await sv.waitForTimeout(500);
       const cp=(await storage('ai_flow_drafts_v1')).find(d=>d.id===fl.checkpointId);
       check('Sync : point de reprise mis à jour à la confirmation',!!cp?.syncedAt&&/abandonne le paiement annuel/.test(cp.fields.decisions||''));
       await sv.close();

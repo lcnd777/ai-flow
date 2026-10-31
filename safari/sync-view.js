@@ -46,7 +46,8 @@
         if(act==='resume'){
           const d=await A.request('syncDraft',{flowId,entryId:id});
           if(!d?.draft){$('sync-summary').textContent='Brouillon illisible : récupère à nouveau les avancées (rien n’a été marqué comme synchronisé).';return;}
-          entryId=id;from=d.entry.from;to=d.entry.to;head();$('sync-preview').hidden=false;$('sync-packet').value=d.draft.packet;manual=true;size();after(d.entry.state);
+          // Repartir d'un état vide : aucune capture précédente de cette page ne doit se mêler au brouillon repris.
+          reset();entryId=id;from=d.entry.from;to=d.entry.to;head();$('sync-preview').hidden=false;$('sync-packet').value=d.draft.packet;manual=true;size();after(d.entry.state);
         }else{await A.request('syncState',{flowId,entryId:id,state:act==='confirm'?'confirmed':'cancelled'});await loadFlow();if(act==='confirm')$('sync-summary').textContent='Synchronisation confirmée : le point de référence a avancé.';}
       }catch(e){$('sync-summary').textContent=e.message;}
     };

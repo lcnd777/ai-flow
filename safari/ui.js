@@ -50,19 +50,25 @@
       <footer><span class="conn ${c.cls}">${esc(c.text)}</span>${action}</footer></article>`;
   }
   function smartSwitchHTML(state,opts={}){
-    const sw=A.smartSwitch(state);
-    if(!sw.pressured.length)return '';
-    const names=sw.pressured.map(s=>A.platform(s.platform).name);
-    const head=sw.pressured.some(s=>s.limitReached)?`${names.join(' et ')} : limite atteinte.`:`${names.join(' et ')} ${names.length>1?'approchent':'approche'} de sa limite.`;
-    const row=(s,txt)=>`<button class="alt" data-open-platform="${s.platform}">${logo(s.platform,'sm')}<span>${esc(A.platform(s.platform).name)}</span><small>${esc(txt)}</small></button>`;
-    const avail=sw.available.map(s=>row(s,`${Math.round(s.worst)} % utilisés · ${A.updatedText(s.updatedAt)}`)).join('');
-    const unknown=[...sw.unknown,...sw.partial].map(s=>A.platform(s.platform).name);
-    const unmeasured=sw.unmeasured.map(s=>A.platform(s.platform).name);
+    const o=A.switchOffer(state,Date.now(),opts.current||null);
+    if(!o.mode)return '';
+    const nm=id=>A.platform(id).name;
+    const row=(s,txt)=>`<button class="alt" data-open-platform="${s.platform}">${logo(s.platform,'sm')}<span>${esc(nm(s.platform))}</span><small>${esc(txt)}</small></button>`;
+    const avail=o.available.map(s=>row(s,`${Math.round(s.worst)} % utilisés · ${A.updatedText(s.updatedAt)}`)).join('');
+    const transfer=opts.transfer!==false?`<button class="${o.mode==='calm'?'ghost':'primary'} small" data-open-page="transfer">Préparer le transfert de contexte</button>`:'';
+    if(o.mode!=='pressured'){
+      const head=o.mode==='risk'?`${o.risky.map(nm).join(' et ')} ${o.risky.length>1?'risquent':'risque'} d’atteindre sa limite avant le reset (estimation).`
+        :opts.current?'Une autre IA est disponible si tu veux changer.':'Disponible maintenant, du plus de marge au moins de marge.';
+      return `<section class="switch-card ${o.mode}" role="status"><div class="switch-head"><b>Smart Switch</b><span>${esc(head)}</span></div><div class="alts">${avail}</div>${transfer}</section>`;
+    }
+    const names=o.pressured.map(s=>nm(s.platform));
+    const head=o.pressured.some(s=>s.limitReached)?`${names.join(' et ')} : limite atteinte.`:`${names.join(' et ')} ${names.length>1?'approchent':'approche'} de sa limite.`;
+    const unknown=[...o.unknown,...o.partial].map(s=>nm(s.platform)),unmeasured=o.unmeasured.map(s=>nm(s.platform));
     return `<section class="switch-card" role="status"><div class="switch-head"><b>Smart Switch</b><span>${esc(head)}</span></div>
       ${avail?`<p class="switch-sub">Capacité confirmée :</p><div class="alts">${avail}</div>`:'<p class="switch-sub">Aucune autre plateforme avec une capacité confirmée pour l’instant.</p>'}
       ${unknown.length?`<p class="fine">État inconnu (pas de relevé récent) : ${esc(unknown.join(', '))}.</p>`:''}
       ${unmeasured.length?`<p class="fine">Non mesurées : ${esc(unmeasured.join(', '))}.</p>`:''}
-      ${opts.transfer!==false?'<button class="primary small" data-open-page="transfer">Préparer le transfert de contexte</button>':''}</section>`;
+      ${transfer}</section>`;
   }
   const isMac=()=>/Mac/i.test(navigator.platform||navigator.userAgent)&&!(navigator.maxTouchPoints>1)&&!/iPhone|iPad/i.test(navigator.userAgent);
   function awakeText(s){

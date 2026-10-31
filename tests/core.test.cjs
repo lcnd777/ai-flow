@@ -103,3 +103,15 @@ test('Awake mode Terminal : commande caffeinate calculée jusqu’à l’échéa
   assert.equal(A.caffeinateCommand(NOW+2*H+600000,NOW),'caffeinate -i -t 7800');
   assert.equal(A.caffeinateCommand(NOW-1,NOW),'','échéance passée : aucune commande');
 });
+test('Smart Switch : visible dès qu’une autre plateforme est disponible, discret quand rien ne presse',()=>{
+  const {AIFlow:A}=require('./helpers.cjs').core();const now=Date.now(),H=3600000;
+  const m=(p,o)=>({percent:p,source:'observed',observedAt:now,resetAt:now+o});
+  let s=A.clean({metrics:{'claude.session':m(40,3*H),'claude.weekly':m(20,100*H),'codex.session':m(5,4*H),'codex.weekly':m(30,100*H)}});
+  const calm=A.switchOffer(s,now,'claude');
+  assert.equal(calm.mode,'calm');assert.equal(calm.available.map(x=>x.platform).join(),'codex');
+  assert.equal(A.switchOffer(s,now,null).available.length,2,'tableau de bord : toutes les plateformes disponibles');
+  s=A.clean({metrics:{'claude.session':m(92,3*H),'codex.session':m(5,4*H),'codex.weekly':m(30,100*H)}});
+  assert.equal(A.switchOffer(s,now,'claude').mode,'pressured');
+  s=A.clean({metrics:{'claude.session':m(40,3*H)}});
+  assert.equal(A.switchOffer(s,now,'claude').mode,null,'aucune autre plateforme disponible : rien');
+});

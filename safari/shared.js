@@ -334,6 +334,20 @@
     };
   }
 
+  /* Smart Switch visible dès qu'une autre plateforme est disponible (capacité confirmée par un relevé récent) :
+     'pressured' = limite proche ou atteinte ; 'risk' = prévision de dépassement avant le reset ;
+     'calm' = rien ne presse, autres plateformes disponibles (affichage discret). null = rien à proposer. */
+  function switchOffer(state,now=Date.now(),current=null){
+    const sw=smartSwitch(state,now,current);
+    if(sw.pressured.length)return {mode:'pressured',...sw};
+    const pool=current?[current]:visiblePlatforms(state);
+    const risky=pool.filter(p=>{const r=platformRunway(state,p,now);return r&&runwayWorthShowing(r)&&(r.kind==='risk'||r.kind==='risk-uncertain');});
+    const alts=sw.available.filter(s=>s.platform!==current&&!risky.includes(s.platform));
+    if(risky.length&&alts.length)return {mode:'risk',risky,...sw,available:alts};
+    const calm=sw.available.filter(s=>s.platform!==current);
+    if(calm.length)return {mode:'calm',risky:[],...sw,available:calm};
+    return {mode:null,risky:[],...sw,available:[]};
+  }
   // ---------- Notifications (sans répétition) ----------
   function notificationEvents(rawMemo,state,now=Date.now()){
     const memo={sent:{},reached:{}};
@@ -541,6 +555,6 @@
 
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
-    runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,platformConsumption,smartSwitch,notificationEvents,describeEvents,
+    runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,platformConsumption,smartSwitch,switchOffer,notificationEvents,describeEvents,
     HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,cleanCheckpoints,timelineItems,CONTINUITY_RX:RX,splitSentences:sentences,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

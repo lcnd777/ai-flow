@@ -1,10 +1,20 @@
-## Non publié — Consommation par plateforme
+## 0.13.1 — Consommation par plateforme, Smart Switch toujours disponible, fiabilité de la synchronisation
+
+### Smart Switch
+- Visible dès qu’une autre plateforme a une capacité confirmée, même quand rien ne presse : présentation discrète (« Une autre IA est disponible si tu veux changer »), dans la fenêtre AI Flow, le tableau de bord et la pastille (sans ouverture automatique).
+- Prévision de dépassement avant le reset : la plateforme à risque est signalée et les autres sont proposées.
+- Limite proche ou atteinte : affichage complet, comme avant.
+
+### Reprise d’une synchronisation
+- Reprendre un brouillon depuis le journal vide d’abord la capture précédente de la page : aucun mélange entre deux états.
+
+### Consommation par plateforme (développé avec Codex)
 
 - Claude et Codex apparaissent ensemble dans « Ma consommation », en barres côte à côte orange et violettes, sur 24 h ou 7 jours.
 - Suppression du sélecteur session / semaine. Une référence unique par plateforme sur toute la période : session en priorité, hebdomadaire si aucun relevé session n’est disponible.
 - Pas d’addition entre quotas ou plateformes. Totaux et couverture par plateforme, légende, détail au survol / toucher / clavier, absence de mesure distinguée de zéro.
 
-## Non publié — Fiabilité de Smart Context Sync et de la reprise
+### Fiabilité de Smart Context Sync (développé avec Codex)
 
 - Une capture conserve sa révision jusqu’à la préparation : un aperçu périmé ne peut plus remplacer un brouillon récent.
 - Une synchronisation périmée est refusée avant insertion dans la conversation de destination.

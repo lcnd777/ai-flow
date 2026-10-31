@@ -77,7 +77,8 @@ button:disabled{opacity:.45;cursor:default}
 .alt{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:7px 9px;text-align:left}
 .alt:hover{border-color:var(--acc)}
 .alt small{margin-left:auto;color:var(--mut);font-size:10.5px}
-.switch-card .primary{margin-top:10px}
+.switch-card .primary,.switch-card .ghost.small{margin-top:10px}
+.switch-card.calm{background:var(--panel);border-color:var(--edge)}.switch-card.calm .switch-head b{color:var(--mut)}
 
 /* Continuité */
 .cline{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--edge)}

@@ -49,7 +49,7 @@
     const visible=A.visiblePlatforms(state),now=Date.now();
     const order=active?[active.platform,...visible.filter(p=>p!==active.platform)].filter(p=>visible.includes(p)):visible;
     $('now').innerHTML=nowBar();
-    $('switch').innerHTML=U.smartSwitchHTML(state);
+    $('switch').innerHTML=U.smartSwitchHTML(state,{current:active?.platform||null});
     $('platforms').innerHTML=order.length?order.map(pid=>U.platformCard(state,pid,conn,{compact:true})).join(''):'<p class="note">Aucune plateforme affichée. Choisis-les dans Paramètres.</p>';
     $('continuity').innerHTML=continuity();
     const times=visible.map(pid=>A.platformStatus(state,pid,now).updatedAt).filter(Boolean);

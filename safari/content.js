@@ -30,7 +30,7 @@
   .meta{display:flex;justify-content:space-between;gap:8px;color:var(--mut);font-size:10.5px;margin-bottom:11px}
   .tiny{color:var(--mut);font-size:10.5px;line-height:1.55}.late{color:var(--warn)}.est{font-size:11px;color:#cfe0d4;background:var(--soft);border-radius:8px;padding:7px 9px;margin:2px 0 8px}.est em{font-style:normal;color:var(--mut);font-size:10px;border:1px solid var(--edge);border-radius:4px;padding:0 4px;margin-left:4px}
   .card{background:#2a211b;border:1px solid #6e4b36;border-radius:11px;padding:11px;margin-bottom:12px}.card b{display:block;margin-bottom:3px;color:#f3c9ae}
-  .switch{background:#1d2a23;border:1px solid #355443;border-radius:11px;padding:10px 11px;margin:6px 0 10px}.switch b{color:var(--acc)}
+  .switch{background:#1d2a23;border:1px solid #355443;border-radius:11px;padding:10px 11px;margin:6px 0 10px}.switch b{color:var(--acc)}.switch.calm{background:none;border-color:var(--edge)}.switch.calm b{color:var(--mut)}
   .alt{display:flex;align-items:center;gap:7px;width:100%;background:none;border:0;border-top:1px solid var(--edge);padding:7px 0;text-align:left}.alt:first-of-type{border-top:0}.alt small{margin-left:auto;color:var(--mut)}
   .actions{display:flex;flex-wrap:wrap;gap:6px 14px;border-top:1px solid var(--edge);margin-top:10px;padding-top:10px}
   .link{background:none;border:none;color:var(--acc);font-size:11.5px;padding:0}.link:hover{text-decoration:underline}
@@ -169,10 +169,12 @@
     catch(e){send('openPage',{page:'transfer',query:{mode:'checkpoint',from:site,why:'err',err:String(e?.message||'').slice(0,180)}}).catch(()=>{});}
   }
   function switchBlock(){
-    const sw=A.smartSwitch(state,Date.now(),main);
-    if(!sw.pressured.length)return '';
+    const sw=A.switchOffer(state,Date.now(),main);
+    if(!sw.mode)return '';
     const alts=sw.available.slice(0,3).map(s=>`<button class="alt" data-go="${s.platform}">${logo(s.platform)}<span>${esc(name(s.platform))}</span><small>${Math.round(s.worst)} % utilisés</small></button>`).join('');
     const unk=[...sw.unknown,...sw.partial].map(s=>name(s.platform)),unm=sw.unmeasured.map(s=>name(s.platform)).filter(n=>n!==name(site));
+    // Rien ne presse : proposition discrète des autres IA disponibles (pas d'ouverture automatique de la fenêtre).
+    if(sw.mode!=='pressured')return `<div class="switch calm"><b>Smart Switch</b><div class="tiny">${sw.mode==='risk'?`${esc(name(main))} risque d’atteindre sa limite avant le reset (estimation).`:'Autre IA disponible si tu veux changer :'}</div>${alts}</div>`;
     return `<div class="switch"><b>Smart Switch</b><div class="tiny">${esc(name(main))} ${sw.pressured[0].limitReached?'a atteint sa limite':'approche de sa limite'}.</div>
       ${alts?`<div class="tiny" style="margin-top:6px">Capacité confirmée :</div>${alts}`:'<div class="tiny">Aucune autre plateforme avec une capacité confirmée.</div>'}
       ${unk.length?`<div class="tiny">État inconnu : ${esc(unk.join(', '))}.</div>`:''}${unm.length?`<div class="tiny">Non mesurées : ${esc(unm.join(', '))}.</div>`:''}
