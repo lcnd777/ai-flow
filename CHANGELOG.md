@@ -1,3 +1,7 @@
+## 0.13.3 — Smart Switch seulement s’il y a une alternative
+
+- Le Smart Switch ne s’affiche que si au moins une autre plateforme a une capacité confirmée. Exemple corrigé : Claude à 98 % et Codex à 100 % → plus de carte « Aucune autre plateforme… ».
+
 ## 0.13.2 — Smart Switch masqué quand tout est à la limite
 
 - Le Smart Switch ne s’affiche plus lorsque toutes les plateformes mesurées ont atteint leur limite (aucune alternative à proposer). Il reste affiché si une autre plateforme est disponible ou si son état est inconnu.
