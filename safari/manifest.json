@@ -2,64 +2,44 @@
   "manifest_version": 3,
   "name": "AI Flow — Usage Monitor",
   "short_name": "AI Flow",
-  "version": "0.7.0",
-  "description": "Suivi transparent des quotas Claude et ChatGPT, alertes facultatives et prévision de session. Stockage local.",
-  "permissions": [
-    "storage",
-    "alarms",
-    "scripting",
-    "nativeMessaging"
+  "version": "0.8.0",
+  "version_name": "0.8.0",
+  "description": "Quotas de Claude, Codex, Grok et plus, Smart Switch, transfert de contexte et reprise du travail. Tout reste sur ton appareil.",
+  "permissions": ["storage", "alarms", "scripting", "nativeMessaging"],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://grok.com/*",
+    "https://gemini.google.com/*",
+    "https://www.perplexity.ai/*",
+    "https://copilot.microsoft.com/*"
   ],
   "action": {
-    "default_title": "AI Flow — Quotas IA",
+    "default_title": "AI Flow",
     "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
+    "default_icon": {"16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png"}
   },
   "background": {
-    "scripts": [
-      "shared.js",
-      "usage-parser.js",
-      "claude-api.js",
-      "codex-api.js",
-      "background.js"
-    ],
+    "scripts": ["platforms.js", "shared.js", "readers.js", "background.js"],
     "persistent": false
   },
-  "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
+  "icons": {"16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png"},
   "content_scripts": [
     {
       "matches": [
         "https://claude.ai/*",
         "https://chatgpt.com/*",
-        "https://chat.openai.com/*"
+        "https://chat.openai.com/*",
+        "https://grok.com/*",
+        "https://gemini.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://copilot.microsoft.com/*"
       ],
-      "js": [
-        "shared.js",
-        "usage-parser.js",
-        "transfer.js",
-        "content.js"
-      ],
+      "js": ["platforms.js", "shared.js", "content.js"],
       "run_at": "document_idle"
     }
   ],
-  "options_page": "options.html",
-  "host_permissions": [
-    "https://claude.ai/*",
-    "https://chatgpt.com/*",
-    "https://chat.openai.com/*"
-  ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'"
-  },
-  "version_name": "0.7.0"
+  "options_ui": {"page": "options.html", "open_in_tab": true},
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'"}
 }

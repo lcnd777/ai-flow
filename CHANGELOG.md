@@ -1,3 +1,42 @@
+## 0.8.0 — Centre de contrôle multi-IA, Awake intégré, vraies pages Tableau de bord et Paramètres
+
+### Développé
+- **Architecture de connecteurs** (`safari/platforms.js` + `safari/readers.js`) : chaque plateforme déclare ses hôtes, limites, niveau de support (lecture auto, expérimental, non mesuré) et son lecteur isolé. Neuf plateformes : Claude, ChatGPT, Codex, Grok, Gemini, GitHub Copilot, Cursor, Perplexity, Microsoft Copilot.
+- **Grok** : lecteur expérimental (requêtes restantes dans la fenêtre glissante), non vérifié sur compte réel. **Gemini, Copilot, Cursor, Perplexity, Microsoft Copilot** : suivi limité clairement indiqué « Non mesuré » (aucune donnée de quota fiable accessible), avec accès direct, Smart Switch et transfert.
+- **ChatGPT et Codex séparés** : Codex est chiffré, les conversations ChatGPT sont « Non mesuré », sans mélange.
+- **Autonomie estimée** (remplace « Prévoir ma session ») : intégrée aux cartes, calculée sur l'historique local avec une fourchette selon la variabilité, marquée « Estimation ». Masquée sans données suffisantes.
+- **Smart Switch** : quand une IA approche de sa limite, propose uniquement les plateformes dont la capacité est confirmée par un relevé récent. Les autres sont listées à part (« État inconnu », « Non mesurées »). Présent dans le popup, le tableau de bord et la pastille.
+- **Transfert de contexte structuré** : objectif, contexte, décisions, contraintes, fait, prochaines actions, extrait. Aperçu modifiable, copie puis ouverture de la destination. Depuis la pastille, la sélection est reprise (sur clic uniquement).
+- **Reprises de travail** : enregistrées localement depuis le transfert, retrouvables dans le popup et le tableau de bord, rappelées dans la notification de reset.
+- **Notifications** : limite proche (90 %), limite atteinte, quota de nouveau disponible (seulement après relevé confirmé). Une seule par période, chaque type désactivable. Canaux : bannière dans la pastille ; notifications système sur Chrome/Edge ; notifications macOS via l'app sur Safari Mac.
+- **Historique 24 h / 7 jours** : courbe des mesures réelles, trous visibles (aucune donnée), périodes de limite, resets constatés, export JSON.
+- **Personnalisation** : afficher ou masquer et réordonner les plateformes, lecture auto par plateforme, état de connexion et raison d'indisponibilité.
+- **Tableau de bord** (`dashboard.html`) et **Paramètres** (`options.html`) refaits en vraies pages responsive, ouvertes dans un onglet normal (jamais épinglé, réutilisé si déjà ouvert).
+- **Awake finalisé** : `native/SafariWebExtensionHandler.swift` et `native/AppDelegate.swift`, installés automatiquement par `prepare-safari.sh`. L'app Mac maintient le Mac éveillé avec une assertion IOKit jusqu'à 10 min après la relance (12 h maximum), puis libère seule. Pause sous 20 % de batterie, état dans la barre des menus, arrêt manuel, ouverture à la connexion. Désactivé par défaut, état affiché (actif, prêt, désactivé, indisponible + raison), bouton « Tester (2 min) ».
+- **Chrome / Edge** : `node tools/build.mjs` produit `dist/chrome-edge` (service worker, notifications).
+- **Tests** : 39 tests unitaires et de non-régression, 39 vérifications d'intégration dans Chromium.
+
+### Corrigé
+- Boutons « Paramètres » et « Tableau de bord » du popup inutilisables : ils ouvrent désormais un onglet pleine taille, et le popup se referme.
+- Sur Chrome, un onglet AI Flow déjà ouvert n'était pas retrouvé (URL masquée sans permission « tabs ») : il est réutilisé grâce à `runtime.getContexts`.
+- Un relevé d'un autre compte ou après déconnexion n'est plus affiché (relevés de la plateforme effacés).
+- L'ancien code Awake dépendait d'un App Group fictif et n'était branché nulle part : remplacé par un lien local `aiflow://`, sans App Group.
+- `prepare-safari.sh` ne s'arrête plus si le dossier existe (nouveau nom automatique) et ouvre Xcode.
+
+### Supprimé
+- Lecteur DOM des pages d'usage, double implémentation des lecteurs Claude et Codex, anciens « trackers » (pouvaient recharger des onglets), AI Runway et réserve de sécurité, export « barre de menus » jamais implémenté côté Mac.
+
+### Fonctionnel mais à valider sur navigateur réel
+- Tout le parcours sur **Safari Mac et iOS** (testé sur Chromium uniquement).
+- Lecture **Grok** sur compte réel.
+- Compilation et comportement de l'**app Mac** (Awake, barre des menus, notifications).
+- Sélecteurs de la relance sur les interfaces réelles de Claude et ChatGPT.
+
+### Impossible ou non vérifié
+- Quotas des conversations ChatGPT, de Gemini, de Perplexity et de Microsoft Copilot : non exposés.
+- GitHub Copilot et Cursor : visibles uniquement sur leurs tableaux de bord, via des interfaces non documentées. Connecteurs préparés, non activés.
+- Awake ne réveille pas un Mac déjà endormi et ne fonctionne pas capot fermé sur batterie.
+
 ## 0.7.0 — Mise à jour automatique, relance après quota, fenêtre simplifiée
 
 - Quotas mis à jour sans clic : depuis tout onglet Claude / ChatGPT ouvert (toutes les 2 min, à l’ouverture de la fenêtre, au retour sur l’onglet). Aucun onglet n’est ouvert ni rechargé automatiquement.

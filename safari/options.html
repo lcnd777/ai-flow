@@ -1,22 +1,53 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Paramètres — AI Flow</title><link rel="stylesheet" href="ui.css"></head>
-<body class="options"><main>
-  <div class="brand"><span class="brand-symbol">◉</span><div><div class="brand-name">AI Flow</div><div class="sub">Usage Monitor · Paramètres</div></div></div>
-  <h1>Une interface à ton rythme.</h1><p><a class="secondary" href="popup.html" target="_blank" rel="noopener">Ouvrir le tableau de bord dans un onglet ↗</a></p><p class="intro">Personnalise les alertes et garde le contrôle. AI Flow ne lit aucun historique automatiquement et ne transmet aucun relevé à un tiers. Le suivi charge uniquement les pages officielles des plateformes.</p>
-  <section class="panel"><h2>Apparence</h2>
-    <div class="setting-line"><div><b>Afficher le widget flottant</b><span>Sur ChatGPT et Claude, dans les pages web</span></div><label class="switch"><input id="widgetEnabled" aria-label="Afficher le widget flottant" type="checkbox"><span></span></label></div>
-    <div class="setting-line"><div><b>Flow Guardian</b><span>Masque les pourcentages sans alerte pour réduire les distractions</span></div><label class="switch"><input id="focusMode" aria-label="Flow Guardian" type="checkbox"><span></span></label></div>
-  </section>
-  <section class="panel"><h2>Alertes de quotas</h2><p class="warning">Les seuils changent la couleur de la jauge et du badge de l'extension. Les notifications système sont facultatives et désactivées par défaut.</p>
-    <div class="setting-line"><div><b>Alerte préventive à 80 %</b><span>État orange lorsque le quota est observé</span></div><label class="switch"><input id="alertAt80" aria-label="Alerte à 80 pour cent" type="checkbox"><span></span></label></div>
-    <div class="setting-line"><div><b>Alerte critique à 95 %</b><span>État rouge lorsque le quota est observé</span></div><label class="switch"><input id="alertAt95" aria-label="Alerte à 95 pour cent" type="checkbox"><span></span></label></div>
-    <div class="setting-line"><div><b>Notifications système</b><span>Désactivées par défaut. Alerte uniquement lors de nouveaux seuils atteints sur des relevés récents.</span></div><label class="switch"><input id="systemAlerts" aria-label="Notifications système" type="checkbox"><span></span></label></div>
-  </section>
-  <section class="panel"><h2>Barre de menus Mac</h2><p class="warning">La liaison automatique nécessite l’application macOS signée et la variante Safari Mac. Seuls les quotas et leurs dates sont partagés localement. Les autres navigateurs peuvent exporter un instantané ponctuel.</p>
-  <label><input id="nativeMenuEnabled" type="checkbox"> Partager les quotas avec l’application Mac</label><p id="native-status" role="status"></p>
-  <button id="exportMenu" class="secondary">Exporter les quotas pour le Mac</button></section>
-  <section class="panel"><h2>Confidentialité & données</h2><p class="warning">Les relevés sont enregistrés localement et peuvent être partagés avec le menu Mac si tu actives cette option : pourcentages, dates, sources et réglages. Aucun service d’analyse tiers, aucun identifiant, cookie ou jeton collecté. Le navigateur utilise normalement ta session pour charger les pages officielles, sans donner tes identifiants à AI Flow. La mise à jour automatique lit les quotas depuis les onglets Claude ou ChatGPT déjà ouverts (toutes les 2 min, et à l’ouverture de la fenêtre AI Flow), sans jamais ouvrir ni recharger d’onglet ; elle se désactive par plateforme dans « Mes comptes ». La relance programmée, désactivée par défaut, n’envoie que le message que tu as choisi, une seule fois, dans la conversation choisie. Le transfert traite uniquement le texte que tu sélectionnes ou colles volontairement, sans le conserver. La copie utilise ton presse-papiers. ChatGPT standard n’a pas de compteur automatique dans cette version ; Codex a un lecteur expérimental séparé. Les données peuvent être retardées ou devenir indisponibles après un changement d’interface. Les prévisions sont indicatives.</p>
-    <button class="danger-btn" id="clearData">Supprimer tous les relevés</button><p class="notice" id="notice" role="status"></p>
-  </section>
-  <p class="warning">Version 0.7.0 bêta. Sources communes Chrome / Edge / Safari. Le ZIP Apple peut être empaqueté via Safari Web Extension Packager dans App Store Connect avec un compte Apple Developer actif, sans Mac. Xcode sur Mac reste une autre possibilité. Signature et validation sur appareils Apple restent nécessaires. Sur Safari mobile, l’arrière-plan peut être suspendu. Les notifications système sont indisponibles dans le package Safari ; le widget conserve les alertes visuelles.</p>
-  <script src="shared.js"></script><script src="options.js"></script>
-</main></body></html>
+<body class="page">
+  <header class="page-top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><div><b>AI Flow</b><small>Paramètres</small></div></div>
+    <nav class="page-nav" aria-label="Pages AI Flow">
+      <button type="button" data-open-page="dashboard" class="ghost">Tableau de bord</button>
+      <button type="button" data-open-page="transfer" class="ghost">Transférer</button>
+    </nav>
+  </header>
+  <main class="page-main narrow">
+    <section class="hero"><h1>Réglages</h1><p class="lead">Tout est enregistré sur cet appareil. Les changements s’appliquent immédiatement.</p></section>
+
+    <section class="panel"><div class="sec-head"><h2>Plateformes</h2><span class="fine">Afficher · ordre · état</span></div>
+      <div id="platforms" class="prow-list"></div>
+      <p class="fine">« Lecture auto » lit les quotas depuis un onglet déjà ouvert de la plateforme, toutes les 2 minutes et à l’ouverture d’AI Flow. Aucun onglet n’est ouvert ni rechargé pour cela. Les plateformes « non mesurées » n’exposent pas de quota fiable : AI Flow n’affiche aucun chiffre pour elles.</p>
+    </section>
+
+    <section class="panel"><h2>Notifications</h2>
+      <div class="setting"><div><b>Limite proche</b><span>Une fois par période, quand un quota mesuré atteint 90 %.</span></div><label class="switch"><input type="checkbox" data-setting="notifyApproaching"><span></span></label></div>
+      <div class="setting"><div><b>Limite atteinte</b><span>Avec l’heure de réouverture quand elle est connue.</span></div><label class="switch"><input type="checkbox" data-setting="notifyReached"><span></span></label></div>
+      <div class="setting"><div><b>Quota de nouveau disponible</b><span>Uniquement après un nouveau relevé qui confirme le reset.</span></div><label class="switch"><input type="checkbox" data-setting="notifyReset"><span></span></label></div>
+      <div class="setting"><div><b id="sys-title">Notifications du système</b><span id="sys-desc">En plus de la bannière discrète dans la pastille AI Flow.</span></div><label class="switch"><input type="checkbox" data-setting="systemNotifications"><span></span></label></div>
+    </section>
+
+    <section class="panel"><h2>Pastille dans les sites</h2>
+      <div class="setting"><div><b>Afficher la pastille AI Flow</b><span>En bas à droite de Claude, ChatGPT, Grok, Gemini…</span></div><label class="switch"><input type="checkbox" data-setting="widgetEnabled"><span></span></label></div>
+      <div class="setting"><div><b>Flow Guardian</b><span>La pastille affiche « Pas d’alerte » au lieu des pourcentages tant que tout va bien.</span></div><label class="switch"><input type="checkbox" data-setting="focusMode"><span></span></label></div>
+    </section>
+
+    <section class="panel"><h2>Continuité</h2>
+      <div class="setting"><div><b>Relance après quota</b><span>Quand Claude atteint sa limite dans une conversation, la pastille propose de la relancer à la réouverture. Sur ChatGPT, tu choisis l’heure. Un seul envoi, annulable.</span></div><label class="switch"><input type="checkbox" data-setting="resumePrompt"><span></span></label></div>
+      <div class="setting"><div><b>Awake : garder le Mac éveillé</b><span>Empêche la mise en veille automatique jusqu’à 10 min après une relance programmée, puis s’arrête tout seul.</span></div><label class="switch"><input type="checkbox" data-setting="awakeEnabled"><span></span></label></div>
+      <div class="kv"><span>État</span><b id="awake-state" class="muted">Vérification…</b></div>
+      <div class="row-actions"><button type="button" id="awake-test" class="ghost small">Tester (2 min)</button><button type="button" id="awake-refresh" class="ghost small">Revérifier</button></div>
+      <details class="explain"><summary>Ce qu’Awake peut et ne peut pas faire</summary>
+        <ul>
+          <li>Awake empêche la <b>mise en veille automatique</b> (inactivité). L’écran peut s’éteindre et la session se verrouiller : la relance fonctionne quand même si Safari reste ouvert.</li>
+          <li>Il <b>ne réveille pas</b> un Mac déjà endormi et n’empêche pas la veille quand tu fermes le capot sur batterie, ni une mise en veille manuelle.</li>
+          <li>Il nécessite <b>Safari sur Mac</b> et l’<b>app AI Flow</b> installée (générée avec <code>prepare-safari.sh</code>). Elle se lance seule en arrière-plan quand une relance est programmée et affiche son état dans la barre des menus.</li>
+          <li>Pour la batterie : seul le Mac reste éveillé, pas l’écran ; limité aux relances prévues dans les 12 h ; mis en pause sous 20 % de batterie hors secteur.</li>
+          <li>Indisponible sur iPhone, iPad, Chrome et Edge.</li>
+        </ul></details>
+    </section>
+
+    <section class="panel"><h2>Données et confidentialité</h2>
+      <p class="fine">AI Flow enregistre localement des pourcentages, des dates de reset, l’historique des 7 derniers jours, tes reprises et tes réglages. Aucun mot de passe, cookie, jeton de session ni contenu de conversation n’est enregistré. Rien n’est envoyé à un serveur AI Flow : il n’y en a pas. Les lectures passent par ta session dans l’onglet officiel de chaque plateforme. Les lecteurs Claude, Codex et Grok utilisent des interfaces web internes non documentées : elles peuvent changer sans préavis. AI Flow affiche alors « Indisponible ».</p>
+      <div class="row-actions"><button type="button" id="export" class="ghost small">Exporter l’historique (JSON)</button><button type="button" id="clear-history" class="ghost small">Effacer l’historique</button><button type="button" id="clear" class="danger small">Supprimer tous les relevés</button></div>
+      <p id="notice" class="fine" role="status"></p>
+    </section>
+    <p class="fine center" id="version"></p>
+  </main>
+  <script src="platforms.js"></script><script src="shared.js"></script><script src="ui.js"></script><script src="options.js"></script>
+</body></html>

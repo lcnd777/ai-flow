@@ -1,1 +1,37 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Flow · Transfert</title><link rel="stylesheet" href="ui.css"></head><body class="options"><main><h1>Continuer ton travail.</h1><div id="transfer"></div><a href="popup.html">Retour au tableau de bord</a></main><script src="transfer.js"></script><script src="transfer-page.js"></script></body></html>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Transfert — AI Flow</title><link rel="stylesheet" href="ui.css"></head>
+<body class="page">
+  <header class="page-top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><div><b>AI Flow</b><small>Transfert de contexte</small></div></div>
+    <nav class="page-nav" aria-label="Pages AI Flow">
+      <button type="button" data-open-page="dashboard" class="ghost">Tableau de bord</button>
+      <button type="button" data-open-page="options" class="ghost">Paramètres</button>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="hero"><h1>Continue ailleurs, sans perdre le fil.</h1>
+      <p class="lead">Résume ton travail en quelques champs : AI Flow en fait un message de reprise clair pour l’autre IA. Rien n’est lu dans tes conversations : seul le texte que tu sélectionnes ou écris ici est utilisé, et rien n’est envoyé sans ton clic.</p></section>
+    <div class="two-col">
+      <form id="form" class="panel" autocomplete="off">
+        <div class="row2">
+          <label>Depuis<select id="source"></select></label>
+          <label>Vers<select id="target"></select></label>
+        </div>
+        <p id="target-state" class="fine"></p>
+        <label>Titre de la reprise<input id="title" maxlength="80" placeholder="Ex. : Refonte de la page tarifs"></label>
+        <div id="fields"></div>
+        <p class="fine"><span id="count">0</span> / 100 000 caractères · Vérifie et retire les informations sensibles avant de copier.</p>
+      </form>
+      <section class="panel preview">
+        <div class="sec-head"><h2>Aperçu du message</h2><button type="button" id="regen" class="ghost small" hidden>Régénérer depuis les champs</button></div>
+        <textarea id="preview" spellcheck="true" aria-label="Aperçu modifiable du message de reprise" placeholder="Remplis au moins un champ : l’aperçu apparaît ici et reste modifiable."></textarea>
+        <div class="row-actions">
+          <button type="button" id="copy" class="primary">Copier et ouvrir</button>
+          <button type="button" id="save" class="ghost">Enregistrer comme reprise</button>
+          <button type="button" id="reset" class="ghost">Effacer</button>
+        </div>
+        <p id="status" class="fine" role="status"></p>
+      </section>
+    </div>
+  </main>
+  <script src="platforms.js"></script><script src="shared.js"></script><script src="ui.js"></script><script src="transfer.js"></script>
+</body></html>

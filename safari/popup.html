@@ -1,44 +1,19 @@
-<!doctype html><html lang="fr" class="popup-root"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Flow</title><link rel="stylesheet" href="ui.css"></head>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Flow</title><link rel="stylesheet" href="ui.css"></head>
 <body class="popup">
+  <header class="pop-top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><div><b>AI Flow</b><small>Never lose your flow</small></div></div>
+    <span id="sync" class="sync" role="status"></span>
+  </header>
   <main>
-    <header class="top">
-      <div class="brand"><span class="brand-symbol">◉</span><div><div class="brand-name">AI Flow</div><div class="sub">Usage Monitor <span class="version">BÊTA 0.7.0</span></div></div></div>
-      <div class="top-right"><span id="health-dot" class="tiny-dot"></span><span id="health-label" class="muted">En attente</span></div>
-    </header>
-    <div class="title-row"><div><div class="eyebrow">TABLEAU DE BORD</div><h1>Garde ton flow.</h1><p class="subtitle">Tes limites, sans interruption.</p></div><span class="decor">↗</span></div>
-    <div class="quick-actions"><button id="open-full" class="primary quick-dashboard" type="button">Ouvrir le tableau de bord en grand <span>↗</span></button></div>
-
-    <div id="provider-cards" class="cards"></div>
-
-    <section class="panel connection-panel" aria-labelledby="connection-title">
-      <div class="connection-heading"><h2 id="connection-title">Mes comptes</h2><span class="tag subtle">Mise à jour auto</span></div>
-      <p class="subtitle">Les quotas se mettent à jour tout seuls dès qu’un onglet Claude ou ChatGPT est ouvert dans Safari et que tu y es connecté. AI Flow ne demande aucun mot de passe.</p>
-      <div id="account-connections" aria-live="polite"></div>
-      <p id="connection-notice" class="notice" role="status"></p>
-    </section>
-
-    <div class="section-head"><h2>Continuité du travail</h2><span class="tag">Relance</span></div>
-    <section class="panel continuity-panel">
-      <div class="setting-line inline-first"><div><b>Relance après quota</b><span>Active la relance programmée dans la pastille AI Flow. Sur Claude, une fenêtre la propose dès que le quota est atteint ; sur ChatGPT, tu choisis l’heure.</span></div><label class="switch"><input type="checkbox" id="resume-toggle" aria-label="Relance après quota"><span></span></label></div>
-      <div id="resume-list" aria-live="polite"></div>
-      <p class="subtitle small">L’envoi se fait depuis ton compte, une seule fois, et reste annulable. Anthropic et OpenAI encadrent l’usage de scripts sur leurs sites : à utiliser en connaissance de cause.</p>
-      <div class="quick-links"><a href="transfer.html" target="_blank">Transférer vers l’autre IA ↗</a></div>
-    </section>
-
-    <div class="section-head"><h2>Prévoir ma session</h2><span class="tag">AI Runway</span></div>
-    <section class="panel">
-      <label for="planner-metric">Plateforme à planifier</label><select id="planner-metric"></select><p class="subtitle">La limite la plus contraignante est signalée. Une donnée absente empêche de confirmer la capacité globale.</p><div class="row split"><label for="duration">Durée de travail prévue</label><select id="duration" aria-label="Durée de session"><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 heure</option><option value="120">2 heures</option><option value="180">3 heures</option><option value="240">4 heures</option><option value="480">8 heures</option></select></div>
-      <div id="runway" class="advice"><span class="advice-icon">✦</span><p>Les prévisions apparaîtront après plusieurs relevés.</p></div>
-      <div class="setting-line inline-setting"><div><b>Réserve de sécurité</b><span>Préserver une partie de ton quota</span></div><select id="reserve" aria-label="Réserve de quota"><option value="0">Aucune</option><option value="10">10 %</option><option value="15">15 %</option><option value="20">20 %</option><option value="30">30 %</option><option value="40">40 %</option><option value="50">50 %</option></select></div>
-    </section>
-
-    <div class="setting-line"><div><b>Flow Guardian</b><span>Sur Claude et ChatGPT, la pastille AI Flow affiche « Pas d’alerte » au lieu des pourcentages tant que tout va bien.</span></div><label class="switch"><input type="checkbox" id="focus-toggle" aria-label="Flow Guardian"><span></span></label></div>
-
-    <details class="panel mobile-setup"><summary>Premiers pas</summary>
-      <ol><li>Dans Safari, autorise AI Flow sur claude.ai et chatgpt.com (menu de la page ou Réglages › Extensions).</li><li>Ouvre Claude ou ChatGPT et connecte-toi : la pastille AI Flow apparaît en bas à droite.</li><li>Les quotas s’affichent ici en quelques secondes, puis se mettent à jour tout seuls.</li></ol>
-      <p class="subtitle">« Indisponible » ne signifie jamais 0 % : la valeur n’a simplement pas pu être lue. Safari peut suspendre l’extension en arrière-plan ; revenir sur l’onglet relance la lecture.</p>
-    </details>
-    <footer><a href="https://claude.ai/settings/usage" target="_blank" rel="noreferrer">Usage Claude ↗</a><a href="popup.html" target="_blank">Tableau de bord ↗</a><a href="options.html" target="_blank">Paramètres ↗</a></footer>
+    <div id="switch"></div>
+    <div id="continuity"></div>
+    <div id="platforms" class="plist" aria-live="polite"></div>
+    <p class="fine">« Non mesuré » : la plateforme n’expose pas son quota. AI Flow n’affiche jamais de chiffre inventé.</p>
   </main>
-  <script src="shared.js"></script><script src="popup.js"></script>
+  <nav class="pop-nav" aria-label="Pages AI Flow">
+    <button type="button" data-open-page="dashboard">Tableau de bord</button>
+    <button type="button" data-open-page="transfer">Transférer</button>
+    <button type="button" data-open-page="options">Paramètres</button>
+  </nav>
+  <script src="platforms.js"></script><script src="shared.js"></script><script src="ui.js"></script><script src="popup.js"></script>
 </body></html>

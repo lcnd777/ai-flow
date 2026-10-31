@@ -1,0 +1,29 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tableau de bord — AI Flow</title><link rel="stylesheet" href="ui.css"></head>
+<body class="page">
+  <header class="page-top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><div><b>AI Flow</b><small>Tableau de bord</small></div></div>
+    <nav class="page-nav" aria-label="Pages AI Flow">
+      <button type="button" id="refresh" class="ghost">Actualiser</button>
+      <button type="button" data-open-page="transfer" class="ghost">Transférer</button>
+      <button type="button" data-open-page="options" class="ghost">Paramètres</button>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="hero"><h1>Garde ton flow.</h1><p id="summary" class="lead"></p></section>
+    <div id="switch"></div>
+    <section><div class="sec-head"><h2>Plateformes</h2><span id="sync" class="sync"></span></div><div id="platforms" class="grid"></div>
+      <p class="fine">Les pourcentages viennent uniquement des plateformes elles-mêmes, lus dans tes onglets ouverts. « Indisponible » signifie que la valeur n’a pas pu être lue, jamais 0 %. Les estimations d’autonomie sont calculées localement et signalées comme telles.</p></section>
+    <section class="panel"><div class="sec-head"><h2>Historique</h2>
+      <div class="seg" role="tablist"><button type="button" data-range="24" class="on" role="tab">24 h</button><button type="button" data-range="168" role="tab">7 jours</button></div></div>
+      <label class="inline">Quota <select id="metric"></select></label>
+      <div id="chart" class="chart"></div>
+      <div class="legend"><span><i class="lg-line"></i>Mesure réelle</span><span><i class="lg-limit"></i>Limite atteinte</span><span><i class="lg-reset"></i>Reset constaté</span><span><i class="lg-gap"></i>Aucune donnée</span></div>
+      <div id="events" class="events"></div>
+    </section>
+    <section class="panel"><div class="sec-head"><h2>Continuité</h2><button type="button" class="ghost small" data-open-page="options">Réglages ›</button></div>
+      <div id="jobs"></div><div id="awake" class="kv"></div>
+      <h3>Reprises enregistrées</h3><div id="drafts"></div>
+    </section>
+  </main>
+  <script src="platforms.js"></script><script src="shared.js"></script><script src="ui.js"></script><script src="dashboard.js"></script>
+</body></html>
