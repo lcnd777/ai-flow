@@ -14,9 +14,10 @@
     <section id="source" class="panel source-card" hidden>
       <div class="sec-head"><h2>Conversation récupérée</h2><button type="button" id="drop-capture" class="ghost small">Ne pas l’utiliser</button></div>
       <p id="source-info" class="fine"></p>
+      <p id="attach-note" class="fine warn" hidden></p>
       <div class="modes inline-modes" role="radiogroup" aria-label="Contenu à transférer">
-        <label class="mode"><input type="radio" name="mode" value="resume" checked><div><b>Résumé de reprise + derniers échanges</b><span>Recommandé : l’objectif, tes notes et la fin de la conversation.</span></div></label>
-        <label class="mode"><input type="radio" name="mode" value="full"><div><b>Conversation complète</b><span>Tous les messages, dans la limite de taille choisie.</span></div></label>
+        <label class="mode"><input type="radio" name="mode" value="resume" checked><div><b>Continuité intelligente</b><span>Recommandé : objectif, décisions, contraintes, travail fait, problèmes et prochaines étapes, extraits automatiquement, plus les derniers échanges.</span></div></label>
+        <label class="mode"><input type="radio" name="mode" value="full"><div><b>Transfert complet</b><span>Tous les messages dans l’ordre (dans la limite de taille) ; l’IA de destination fait elle-même la synthèse avant de continuer.</span></div></label>
       </div>
       <label class="inline">Taille maximale <select id="budget"><option value="15000">Courte (~15 000 caractères)</option><option value="40000" selected>Standard (~40 000)</option><option value="100000">Longue (~100 000)</option></select></label>
     </section>
@@ -35,7 +36,8 @@
       <section class="panel preview">
         <div class="sec-head"><h2>Message de reprise</h2><button type="button" id="regen" class="ghost small" hidden>Régénérer</button></div>
         <textarea id="preview" spellcheck="true" aria-label="Message de reprise modifiable" placeholder="Récupère une conversation depuis la fenêtre AI Flow ou remplis au moins un champ."></textarea>
-        <p class="fine"><span id="count">0</span> caractères · retire les informations sensibles avant l’envoi.</p>
+        <p class="fine"><span id="count">0</span> · retire les informations sensibles avant l’envoi.</p>
+        <p id="size-warn" class="fine" role="status"></p>
         <label class="mini-check"><input type="checkbox" id="auto-insert" checked> Insérer automatiquement dans la zone de saisie (sans l’envoyer)</label>
         <div class="row-actions">
           <button type="button" id="go" class="primary">Ouvrir et insérer</button>

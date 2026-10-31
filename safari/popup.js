@@ -25,14 +25,14 @@
       const a=awake&&state.settings.awakeMode!=='catchup'?U.awakeText(awake):null;
       rows.push(`<div class="cline">${U.logo(j.platform,'sm')}<div><b>Relance ${esc(A.dayClock(j.at))}</b><small>${j.attempts?'Nouvel essai · '+esc(j.status):'« '+esc(j.message.slice(0,48))+(j.message.length>48?'…':'')+' »'}${a?' · '+esc(a.text):''}</small></div><button class="ghost small" data-cancel="${esc(j.id)}">Annuler</button></div>`);
     }
-    const list=A.cleanCheckpoints(extras.drafts);
-    for(const d of list.filter(d=>d.kind==='interruption'&&d.status!=='done').slice(0,2)){
-      const pid=d.platform||d.source,st=A.platformStatus(state,pid),ok=d.status==='ready'||(st.fresh.length>0&&!st.limitReached);
-      const sub=ok?`${A.platform(pid)?.name||''} est de nouveau disponible`:`Interrompu par la limite ${A.platform(pid)?.name||''}${d.resetAt&&d.resetAt>now?` · rouvre ${A.dayClock(d.resetAt)}`:''}`;
-      rows.push(`<div class="cline ${ok?'ready':''}">${U.logo(d.source||'claude','sm')}<div><b>${esc(d.title)}</b><small>${esc(sub)}</small></div>${ok&&d.url?`<button class="primary small" data-resume="${esc(d.id)}">Reprendre</button>`:`<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>Transférer</button>`}</div>`);
+    const items=A.timelineItems(extras.drafts,state);
+    for(const d of items.slice(0,3)){
+      const act=d.ready&&d.url?`<button class="primary small" data-resume="${esc(d.id)}">Reprendre</button>`
+        :d.destUrl?`<button class="ghost small" data-url="${esc(d.destUrl)}">Continuer</button>`
+        :`<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>${d.interrupted?'Transférer':'Ouvrir'}</button>`;
+      rows.push(`<div class="cline ${d.ready?'ready':''}">${U.logo(d.source||'claude','sm')}<div><b>${esc(d.title)}</b><small>${esc(d.label)} · ${esc(A.dayClock(d.updatedAt))}</small></div>${act}</div>`);
     }
-    const cps=list.filter(d=>d.kind==='checkpoint');
-    if(cps.length)rows.push(`<div class="cline"><span class="logo sm neutral">↺</span><div><b>${cps.length} point${cps.length>1?'s':''} de reprise</b><small>${esc(cps[0].title)}</small></div><button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:cps[0].id}))}'>Reprendre</button></div>`);
+    if(items.length>3)rows.push(`<p class="fine"><a href="#" data-open-page="dashboard">${items.length-3} autre${items.length>4?'s':''} dans la Flow Timeline ›</a></p>`);
     return rows.length?`<section class="continuity"><h2>Continuité</h2>${rows.join('')}</section>`:'';
   }
   function render(){
@@ -48,6 +48,7 @@
     $('sync').className='sync '+(last&&now-last<=A.LATE_MS?'ok':'');
     U.bindNav(document);
     for(const b of document.querySelectorAll('[data-cancel]'))b.onclick=async()=>{b.disabled=true;try{await A.request('resumeCancel',{id:b.dataset.cancel});}catch{}await reload();};
+    for(const b of document.querySelectorAll('[data-url]'))b.onclick=()=>U.openUrl(b.dataset.url);
     for(const b of document.querySelectorAll('[data-resume]'))b.onclick=async()=>{
       const list=A.cleanCheckpoints(extras.drafts),d=list.find(x=>x.id===b.dataset.resume);if(!d)return;
       d.status='done';d.updatedAt=Date.now();await U.saveDrafts(list);

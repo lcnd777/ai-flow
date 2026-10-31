@@ -63,3 +63,9 @@ Sans app Mac, Safari ne répond jamais à un appel natif, ce que Chromium ne rep
 - Publication automatique du build 5 par GitHub Actions : tests, compilation macOS 15, test de lancement, signature Ed25519, appcast.
 - Mise à jour via Sparkle (« Rechercher des mises à jour… » › Installer et relancer) : nouvelle version active (« 0.11.0 dev 5 »), réglages conservés.
 - Problème rencontré et corrigé : avec la signature ad hoc, le runtime renforcé refusait de charger Sparkle.framework (« different Team IDs »). Le runtime renforcé n’est donc activé qu’avec Developer ID, et la CI lance l’app 10 s avant toute publication.
+
+## Ajouts 0.12.0
+- Tests : `tests/transfer.test.cjs` (continuité intelligente, pièces jointes, taille), `tests/recovery.test.cjs` (lien de destination, fusion, reprise confirmée, notification cliquable, timeline, suppression, barre de menus) : **88 / 88**.
+- Intégration Chromium (sites simulés) : **57 / 57**, dont extraction automatique, pièce jointe signalée, taille estimée, suggestion de point de reprise et bouton dans la pastille.
+- Compilation macOS dans le cloud : validée par la CI, avec lancement de l’app pendant 10 s.
+- Non vérifié : conversations et pièces jointes des vrais sites, affichage réel de la barre de menus.

@@ -24,7 +24,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     const u=new URL(r.request().url());
     if(u.pathname==='/api/organizations')return r.fulfill({json:[{uuid:ORG,capabilities:['chat']}]});
     if(u.pathname===`/api/organizations/${ORG}/usage`)return r.fulfill({json:claude});
-    if(u.pathname===`/api/organizations/${ORG}/chat_conversations/${CONV}`)return r.fulfill({json:{name:'Refonte page tarifs',chat_messages:[{index:0,sender:'human',text:'Objectif : refaire la page tarifs en trois offres.'},{index:1,sender:'assistant',text:'Proposition : Starter, Pro, Équipe.'},{index:2,sender:'human',text:'Écris maintenant la FAQ.'}]}});
+    if(u.pathname===`/api/organizations/${ORG}/chat_conversations/${CONV}`)return r.fulfill({json:{name:'Refonte page tarifs',chat_messages:[{index:0,sender:'human',text:'Objectif : refaire la page tarifs en trois offres. Il faut que ce soit prêt avant vendredi.',files:[{file_name:'devis.pdf'}]},{index:1,sender:'assistant',text:'Proposition : Starter, Pro, Équipe. On part sur un paiement annuel.'},{index:2,sender:'human',text:'Le bouton Payer ne fonctionne pas sur Safari. Écris maintenant la FAQ.'}]}});
     return r.fulfill({contentType:'text/html',body:page('Claude',u.pathname.startsWith('/chat/')?composer:'')});
   });
   await ctx.route('https://chatgpt.com/**',r=>{
@@ -156,6 +156,8 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   check('Notification « approche de sa limite » une seule fois',(toasts||[]).filter(t=>t.type==='approaching'&&t.platform==='claude').length===1,JSON.stringify(toasts));
   await pc.bringToFront();await pc.waitForTimeout(500);
   let w=await widget(pc);
+  check('Flow Recovery : suggestion discrète de point de reprise quand la limite approche',/Point de reprise/.test(text(w.html))&&/Enregistrer un point de reprise/.test(text(w.html)),text(w.html).slice(0,200));
+  check('Pastille : bouton « Point de reprise » sur une conversation',/id="checkpoint"/.test(w.html));
   check('Pastille : Smart Switch dans la page',/Smart Switch/.test(text(w.html))||/approche de sa limite/.test(text(w.html)));
   await pc.screenshot({path:path.join(shots,'widget-toast.png')});
 
@@ -213,8 +215,14 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     const info=await tr.locator('#source-info').innerText().catch(()=>'');
     check('Transfert : conversation récupérée (3 messages, titre)',/Refonte page tarifs/.test(info)&&/3 messages/.test(info),info);
     check('Transfert : destination différente de la source',await tr.locator('#target').inputValue()==='chatgpt');
+    check('Continuité intelligente : décisions, contraintes et problèmes extraits sans saisie',
+      /On part sur un paiement annuel/.test(await tr.locator('[data-field="decisions"]').inputValue())&&
+      /prêt avant vendredi/.test(await tr.locator('[data-field="constraints"]').inputValue())&&
+      /bouton Payer ne fonctionne pas sur Safari/.test(await tr.locator('[data-field="problems"]').inputValue()));
+    check('Pièce jointe signalée comme non transférée',/devis\.pdf/.test(await tr.locator('#attach-note').innerText())&&/\[Pièce jointe non transférée : devis\.pdf\]/.test(await tr.locator('#preview').inputValue()));
+    check('Taille estimée du transfert affichée',/caractères \(~[\d  ]+ jetons\)/.test(await tr.locator('#count').innerText()));
     const prev=await tr.locator('#preview').inputValue();
-    check('Transfert : objectif pré-rempli, derniers échanges dans l’ordre et par rôle',/## Objectif\nObjectif : refaire la page tarifs/.test(prev)&&/## Derniers échanges/.test(prev)&&prev.indexOf('**Moi :**\nObjectif')<prev.indexOf('**Claude :**\nProposition')&&prev.indexOf('Proposition')<prev.lastIndexOf('Écris maintenant la FAQ'),prev.slice(0,500));
+    check('Transfert : objectif pré-rempli, derniers échanges dans l’ordre et par rôle',/## Objectif initial\nObjectif : refaire la page tarifs/.test(prev)&&/## Derniers échanges/.test(prev)&&prev.indexOf('**Moi :**\nObjectif')<prev.indexOf('**Claude :**\nProposition')&&prev.indexOf('Proposition')<prev.lastIndexOf('Écris maintenant la FAQ'),prev.slice(0,500));
     await tr.locator('input[name="mode"][value="full"]').check();await tr.waitForTimeout(200);
     check('Transfert : mode « conversation complète »',/Voici une conversation commencée sur Claude/.test(await tr.locator('#preview').inputValue()));
     await tr.locator('input[name="mode"][value="resume"]').check();
@@ -229,6 +237,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     await tr.locator('#go').click();
     let dest=null;for(let i=0;i<40&&!dest;i++){await tr.waitForTimeout(300);dest=ctx.pages().find(p=>!known.has(p)&&p.url().startsWith('https://chatgpt.com/'));}
     for(let i=0;i<40;i++){await tr.waitForTimeout(300);if(/Inséré|ouvert/.test(await tr.locator('#status').innerText()))break;}
+    check('Lien de destination en attente de la nouvelle conversation',Object.values((await storage('ai_flow_dest_pending_v1'))||{}).some(p=>p.checkpointId));
     check('Transfert : ChatGPT ouvert dans un nouvel onglet, message copié en secours',!!dest&&/ouvert|Inséré/.test(await tr.locator('#status').innerText()));
     // Les onglets créés par l'extension échappent aux sites simulés (page d'erreur réseau) :
     // l'insertion est donc vérifiée sur l'onglet ChatGPT simulé déjà ouvert, avec la même fonction.

@@ -109,6 +109,7 @@ async function refreshPlatform(pid,tab){
     }
     const {state}=await write('metrics',{platform:pid,readings});
     await save(K.history,A.recordHistory(await load(K.history,null),readings));
+    await syncMenuBar();
     await notify(state);
   }else if(result.status==='login'){
     // Déconnecté : les anciens pourcentages ne sont plus attribuables à un compte.
@@ -172,10 +173,15 @@ async function notify(state){
   const toasts=(await load(K.toast,[])).filter(t=>Date.now()-t.ts<3600000);
   await save(K.toast,[...toasts,...list].slice(-6));
   if(!state.settings.systemNotifications)return;
+  const links=await load(NOTIFY_LINKS,{});
   for(const n of list){
-    if(api.notifications?.create){try{await api.notifications.create('ai-flow:'+n.platform+':'+n.ts,{type:'basic',iconUrl:'icons/icon128.png',title:n.title,message:n.body});}catch{}}
+    const nid='ai-flow:'+n.platform+':'+n.ts;
+    if(n.url)links[nid]={url:n.url,at:Date.now()};
+    if(api.notifications?.create){try{await api.notifications.create(nid,{type:'basic',iconUrl:'icons/icon128.png',title:n.title,message:n.body});}catch{}}
     else await nativeCall({type:'AI_FLOW_NOTIFY',title:n.title,body:n.body});
   }
+  for(const [k,v] of Object.entries(links))if(Date.now()-v.at>7*86400000)delete links[k];
+  await save(NOTIFY_LINKS,links);
 }
 
 /* ---------- Flow Recovery : travail interrompu par une limite, puis repris ---------- */
@@ -191,16 +197,18 @@ async function recordInterruptions(events,notices){
     for(const e of reached){
       for(const t of tabs.filter(t=>affects(e.platform,t.url||'')).slice(0,2)){
         const url=PL.conversationOf(t.url).url;
+        const cp=list.find(d=>d.url===url&&d.kind==='checkpoint'&&d.status!=='done');
+        if(cp){cp.interrupted=true;cp.platform=e.platform;cp.resetAt=e.resetAt||null;cp.status='open';cp.updatedAt=now;continue;}
         if(list.some(d=>d.url===url&&d.kind==='interruption'&&d.status!=='done'&&now-d.updatedAt<12*3600000))continue;
         list.unshift({id:'int-'+now+'-'+t.id,kind:'interruption',title:cleanTitle(t.title),source:PL.siteFor(url),platform:e.platform,url,fields:{},preview:'',createdAt:now,updatedAt:now,resetAt:e.resetAt||null,status:'open'});
       }
     }
   }
   for(const e of reopened){
-    for(const d of list)if(d.kind==='interruption'&&d.platform===e.platform&&d.status==='open'){d.status='ready';d.updatedAt=now;}
-    const ready=list.find(d=>d.kind==='interruption'&&d.platform===e.platform&&d.status==='ready');
+    for(const d of list)if(d.interrupted&&d.platform===e.platform&&['open','waiting'].includes(d.status)){d.status='ready';d.updatedAt=now;}
+    const ready=list.find(d=>d.interrupted&&d.platform===e.platform&&d.status==='ready');
     const n=notices.find(x=>x.platform===e.platform&&x.type==='reset');
-    if(ready&&n&&!n.url){n.url=ready.url;n.body+=` Reprendre « ${ready.title.slice(0,50)} » ?`;}
+    if(ready&&n&&!n.url){n.url=ready.url;n.checkpointId=ready.id;n.body+=` Reprendre « ${ready.title.slice(0,50)} » ?`;}
   }
   await save(K.drafts,A.cleanCheckpoints(list));
 }
@@ -216,25 +224,41 @@ async function captureConversation(tabId){
   const messages=[];let total=0;
   for(const m of Array.isArray(r?.messages)?r.messages.slice(-800):[]){
     if((m?.role!=='user'&&m?.role!=='assistant')||typeof m.text!=='string')continue;
-    const text=m.text.slice(0,60000);if(!text.trim())continue;
-    total+=text.length;if(total>600000)break;messages.push({role:m.role,text});
+    const text=m.text.slice(0,60000);
+    const attachments=(Array.isArray(m.attachments)?m.attachments:[]).filter(x=>typeof x==='string').slice(0,20).map(x=>x.slice(0,100));
+    if(!text.trim()&&!attachments.length)continue;
+    total+=text.length;if(total>600000)break;messages.push({role:m.role,text,attachments});
   }
   if(!messages.length)throw Error('Aucun message lisible dans cet onglet. Sélectionne le texte utile et utilise « Transférer » dans la pastille, ou remplis les champs à la main.');
   const conv=PL.conversationOf(tab.url||'');
-  const capture={ts:Date.now(),platform:site,url:conv?.url||null,title:cleanTitle(r.title||tab.title),source:r.source==='api'?'api':'page',messages};
+  const capture={ts:Date.now(),platform:site,url:conv?.url||null,title:cleanTitle(r.title||tab.title),source:r.source==='api'?'api':'page',messages,attachments:messages.reduce((n,m)=>n+m.attachments.length,0)};
   await save(K.capture,capture);
-  return {count:messages.length,chars:total,title:capture.title,source:capture.source,platform:site};
+  return {count:messages.length,chars:total,title:capture.title,source:capture.source,platform:site,attachments:capture.attachments};
 }
 const NEW_CHAT={claude:'https://claude.ai/new',chatgpt:'https://chatgpt.com/'};
+const NOTIFY_LINKS='ai_flow_notify_links_v1',DEST_PENDING='ai_flow_dest_pending_v1';
+// Lien vers la conversation de destination : rattaché au point de reprise dès que l'onglet obtient son adresse.
+async function linkDestination(tabId,url){
+  const pending=await load(DEST_PENDING,{}),p=pending[tabId];
+  if(!p)return false;
+  const conv=PL.conversationOf(url||'');
+  if(!conv){if(Date.now()-p.at>30*60000){delete pending[tabId];await save(DEST_PENDING,pending);}return false;}
+  const list=A.cleanCheckpoints(await load(K.drafts,[])),cp=list.find(d=>d.id===p.checkpointId);
+  if(cp){cp.destUrl=conv.url;cp.target=conv.platform;cp.updatedAt=Date.now();await save(K.drafts,A.cleanCheckpoints(list));}
+  delete pending[tabId];await save(DEST_PENDING,pending);
+  return !!cp;
+}
+api.tabs.onUpdated?.addListener((tabId,change)=>{if(change.url)serial(()=>linkDestination(tabId,change.url)).catch(()=>{});});
 async function waitLoaded(tabId,ms=20000){
   const end=Date.now()+ms;
   while(Date.now()<end){try{const t=await api.tabs.get(tabId);if(t.status==='complete'&&/^https:/.test(t.url||''))return true;}catch{return false;}await new Promise(r=>setTimeout(r,400));}
   return false;
 }
-async function openAndInsert(platform,text,insert){
+async function openAndInsert(platform,text,insert,checkpointId){
   if(!NEW_CHAT[platform])throw Error('Destination inconnue');
   if(typeof text!=='string'||!text.trim()||text.length>200000)throw Error('Texte vide ou trop long.');
   const tab=await api.tabs.create({url:NEW_CHAT[platform],active:true,pinned:false});
+  if(typeof checkpointId==='string'&&checkpointId){const p=await load(DEST_PENDING,{});p[tab.id]={checkpointId:checkpointId.slice(0,40),at:Date.now()};await save(DEST_PENDING,p);}
   if(!insert)return {status:'opened'};
   if(!await waitLoaded(tab.id))return {status:'not-loaded'};
   try{const f=await api.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',func:R.insertDraft,args:[text]});return f?.[0]?.result||{status:'not-inserted'};}
@@ -278,6 +302,19 @@ async function importData(backup){
   await api.storage.local.set(data);
   await restoreResumeAlarms();await badge();
   return {keys:entries.length};
+}
+
+/* ---------- Barre de menus macOS : mêmes données que la fenêtre et la pastille ---------- */
+const MENU_SYNC='ai_flow_menu_sync_v1';
+async function syncMenuBar(force=false){
+  if(!hasNative())return {sent:false,reason:'native'};
+  const state=await A.getState(),now=Date.now(),snap=A.menuSnapshot(state,now);
+  const sig=JSON.stringify(snap.platforms),last=await load(MENU_SYNC,{});
+  // Envoi seulement si les données ont changé (ou toutes les 10 min, pour l'indication de fraîcheur).
+  if(!force&&last.sig===sig&&now-(last.at||0)<10*60000)return {sent:false,reason:'unchanged'};
+  const reply=await nativeCall({type:'AI_FLOW_SNAPSHOT',snapshot:snap});
+  await save(MENU_SYNC,{sig,at:now,ok:!!reply?.ok});
+  return {sent:true,ok:!!reply?.ok};
 }
 
 /* ---------- Awake : maintien éveillé du Mac via l'app AI Flow ---------- */
@@ -443,7 +480,7 @@ async function handle(message,sender){
     case 'openPlatform':return openPlatform(payload?.platform);
     case 'openUrl':return openUrl(String(payload?.url||''));
     case 'captureConversation':return captureConversation(origin==='page'?Number(payload?.tabId):sender.tab.id);
-    case 'openAndInsert':return openAndInsert(payload?.platform,payload?.text,payload?.insert!==false);
+    case 'openAndInsert':return openAndInsert(payload?.platform,payload?.text,payload?.insert!==false,payload?.checkpointId);
     case 'connectionStatuses':return connectionStatuses();
     case 'refresh':return autoRefresh(PL.ids(),true);
     case 'autoRefresh':{
@@ -484,10 +521,14 @@ api.runtime.onMessage.addListener((message,sender,reply)=>{
   return true;
 });
 api.alarms.onAlarm.addListener(alarm=>{
-  if(alarm.name===ALARM)serial(async()=>{await autoRefresh(PL.ids());await syncKeepAwake();await badge();await catchUp();});
+  if(alarm.name===ALARM)serial(async()=>{await autoRefresh(PL.ids());await syncKeepAwake();await badge();await catchUp();await syncMenuBar();});
   else if(alarm.name.startsWith('ai-flow-resume:'))serial(()=>fireResume(alarm.name.slice('ai-flow-resume:'.length)));
 });
-api.notifications?.onClicked?.addListener(id=>{const pid=id.split(':')[1];if(PL.get(pid))serial(()=>openPlatform(pid));});
+api.notifications?.onClicked?.addListener(id=>serial(async()=>{
+  const link=(await load(NOTIFY_LINKS,{}))[id];
+  if(link?.url&&PL.conversationOf(link.url))return openUrl(link.url);
+  const pid=id.split(':')[1];if(PL.get(pid))return openPlatform(pid);
+}));
 async function install(){
   // Un alarme existante n'est jamais repoussée (le service worker se réveille souvent).
   const alarm=await api.alarms.get(ALARM);
@@ -507,4 +548,4 @@ async function catchUp(){
 }
 api.runtime.onStartup?.addListener(()=>serial(async()=>{await install();await catchUp();}));
 serial(install);
-if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,exportData,importData,devInfo,captureConversation,recordInterruptions});
+if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,linkDestination,syncMenuBar,exportData,importData,devInfo,captureConversation,recordInterruptions});

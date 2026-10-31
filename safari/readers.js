@@ -155,7 +155,8 @@
       const c=await get(`/api/organizations/${list[0].uuid}/chat_conversations/${m[1]}?tree=True&rendering_mode=messages&render_all_tools=true`);
       const raw=Array.isArray(c?.chat_messages)?c.chat_messages:[];
       const text=x=>clip(typeof x?.text==='string'&&x.text?x.text:Array.isArray(x?.content)?x.content.filter(b=>b?.type==='text'&&typeof b.text==='string').map(b=>b.text).join('\n\n'):'');
-      const messages=raw.slice().sort((a,b)=>(a.index??0)-(b.index??0)).map(x=>({role:x.sender==='human'?'user':x.sender==='assistant'?'assistant':null,text:text(x)})).filter(x=>x.role&&x.text);
+      const names=x=>[...(Array.isArray(x?.attachments)?x.attachments:[]),...(Array.isArray(x?.files)?x.files:[]),...(Array.isArray(x?.files_v2)?x.files_v2:[])].map(f=>clip(f?.file_name||f?.name||'fichier')).filter(Boolean);
+      const messages=raw.slice().sort((a,b)=>(a.index??0)-(b.index??0)).map(x=>({role:x.sender==='human'?'user':x.sender==='assistant'?'assistant':null,text:text(x),attachments:[...new Set(names(x))]})).filter(x=>x.role&&(x.text||x.attachments.length));
       if(!messages.length)return fromDom();
       return {status:'ok',source:'api',title:clip(c.name)||clip(document.title),messages};
     }catch(e){return fromDom();}
@@ -181,9 +182,10 @@
       const chain=[];let id=c?.current_node,guard=0;
       while(id&&map[id]&&guard++<5000){chain.push(map[id]);id=map[id].parent;}
       const messages=chain.reverse().map(n=>n.message).filter(Boolean).map(x=>{
-        const role=x.author?.role,parts=Array.isArray(x.content?.parts)?x.content.parts.filter(p=>typeof p==='string'):[];
-        return {role,text:clip(parts.join('\n\n')),hidden:x.metadata?.is_visually_hidden_from_conversation};
-      }).filter(x=>(x.role==='user'||x.role==='assistant')&&x.text&&!x.hidden).map(({role,text})=>({role,text}));
+        const role=x.author?.role,all=Array.isArray(x.content?.parts)?x.content.parts:[],parts=all.filter(p=>typeof p==='string');
+        const att=[...(Array.isArray(x.metadata?.attachments)?x.metadata.attachments.map(a=>clip(a?.name||'fichier')):[]),...all.filter(p=>p&&typeof p==='object'&&/image/.test(p.content_type||'')).map(()=>'image')];
+        return {role,text:clip(parts.join('\n\n')),attachments:att,hidden:x.metadata?.is_visually_hidden_from_conversation};
+      }).filter(x=>(x.role==='user'||x.role==='assistant')&&(x.text||x.attachments.length)&&!x.hidden).map(({role,text,attachments})=>({role,text,attachments}));
       if(!messages.length)return fromDom();
       return {status:'ok',source:'api',title:clip(c.title)||clip(document.title),messages};
     }catch(e){return fromDom();}

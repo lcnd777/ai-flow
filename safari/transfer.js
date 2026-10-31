@@ -2,7 +2,7 @@
   'use strict';
   const A=window.AIFlow,U=window.AIFlowUI,$=id=>document.getElementById(id),esc=A.escapeHTML,K=A.KEYS;
   const HINTS={goal:'Ce que tu cherches à obtenir.',context:'Projet, public, technologies, liens utiles…',decisions:'Ce qui est déjà tranché et ne doit pas être remis en question.',
-    constraints:'Délais, ton, format, limites techniques…',done:'Ce qui est terminé.',next:'Les prochaines étapes, dans l’ordre.',excerpt:'Un extrait précis à transmettre tel quel (code, plan…).'};
+    constraints:'Délais, ton, format, limites techniques…',done:'Ce qui est terminé.',problems:'Ce qui bloque encore ou reste à corriger.',next:'Les prochaines étapes, dans l’ordre.',excerpt:'Code, chiffres, liens à transmettre tels quels.'};
   const DEST=['claude','chatgpt'];
   let state=await A.getState(),capture=null,draftId=null,manual=false;
   const name=id=>A.platform(id)?.name||'';
@@ -19,7 +19,8 @@
   }
   function compose(){
     const tr=transcript();
-    if(capture&&mode()==='full')return {text:`Voici une conversation commencée sur ${name(capture.platform)}. Reprends-la là où elle s’est arrêtée.\n\n${tr.text}\n\nConfirme d’abord en une phrase ce que tu as compris, puis continue.`,tr};
+    // Transfert complet : la synthèse est confiée, ouvertement, à l'IA de destination (aucune IA cachée).
+    if(capture&&mode()==='full')return {text:`Voici une conversation commencée sur ${name(capture.platform)}, dans l’ordre, avec les rôles de chacun.\n\n${tr.text}\n\nAvant de continuer, résume en quelques lignes : l’objectif, les décisions prises, les contraintes, ce qui est fait, ce qui reste bloqué et les prochaines étapes. Puis reprends le travail là où il s’est arrêté.`,tr};
     return {text:A.buildHandoff(fields(),name($('source-platform').value),name($('target').value),tr?.text||''),tr};
   }
   function targetState(){
@@ -27,10 +28,18 @@
     $('target-state').textContent=t==='chatgpt'?'Limites de messages ChatGPT non mesurables.'+(st.fresh.length?` Codex : ${Math.round(st.worst)} % utilisés.`:''):st.fresh.length?`${name(t)} : ${Math.round(st.worst)} % utilisés · ${A.updatedText(st.updatedAt)}.`:`${name(t)} : quota inconnu (aucun relevé récent).`;
     $('go').textContent=`Ouvrir ${name(t)}${$('auto-insert').checked?' et insérer':''}`;
   }
+  // Taille du transfert et adéquation à la destination (estimation, ~4 caractères par jeton).
+  function size(){
+    const e=A.estimateTransfer($('preview').value,$('target').value),dest=name($('target').value);
+    $('count').textContent=`${e.chars.toLocaleString('fr-FR')} caractères (~${e.tokens.toLocaleString('fr-FR')} jetons)`;
+    const w=$('size-warn');
+    w.textContent=e.level==='ok'?'':e.level==='large'?`Volumineux pour ${dest} : le texte risque d’être converti en pièce jointe ou tronqué. Préfère « Résumé de reprise » ou une taille plus courte.`:`Trop volumineux pour ${dest} : réduis la taille maximale ou passe en « Résumé de reprise ».`;
+    w.className='fine '+(e.level==='ok'?'':'warn');
+  }
   function update(){
     const {text,tr}=compose();
     if(!manual)$('preview').value=text;
-    $('count').textContent=$('preview').value.length.toLocaleString('fr-FR');
+    size();
     if(capture&&tr)$('source-info').textContent=`« ${capture.title} » · ${name(capture.platform)} · ${capture.messages.length} messages${tr.omitted?` · ${tr.included} repris, ${tr.omitted} intermédiaires omis pour tenir dans la taille choisie`:' · tous repris'}${capture.source==='page'?' · lus depuis la page affichée (les messages non chargés peuvent manquer)':''}.`;
     targetState();
   }
@@ -48,9 +57,14 @@
     $('source-platform').value=c.platform;
     $('target').value=c.platform==='claude'?'chatgpt':'claude';
     if(!$('title').value)$('title').value=c.title||'';
-    const pre=A.prefillFromMessages(c.messages);
-    for(const [k,v] of Object.entries(pre)){const el=document.querySelector(`[data-field="${k}"]`);if(el&&!el.value)el.value=v;}
+    // Continuité intelligente : extraction locale et déterministe (sans IA), toujours modifiable.
+    const ex=A.extractContinuity(c.messages,{title:c.title,source:name(c.platform)});
+    for(const [k,v] of Object.entries(ex.fields)){const el=document.querySelector(`[data-field="${k}"]`);if(el&&!el.value)el.value=v;}
     $('prefill-note').hidden=false;
+    $('prefill-note').textContent=`Rubriques remplies automatiquement à partir des phrases de la conversation (extraction locale, sans IA ni reformulation) : ${ex.found} rubrique${ex.found>1?'s':''} sur 6 trouvée${ex.found>1?'s':''}. Vérifie, complète ou supprime avant le transfert.`;
+    const att=c.messages.flatMap(m=>m.attachments||[]);
+    $('attach-note').hidden=!att.length&&c.source!=='page';
+    $('attach-note').textContent=att.length?`${att.length} pièce${att.length>1?'s':''} jointe${att.length>1?'s':''} non transférée${att.length>1?'s':''} (${[...new Set(att)].slice(0,6).join(', ')}${att.length>6?'…':''}). Ajoute-les à la main dans la destination si elles sont utiles.`:'Lecture depuis la page affichée : les pièces jointes éventuelles ne sont pas détectées ni transférées.';
   }
   // Entrées possibles : capture faite sur clic (popup / pastille), point de reprise existant, ou sélection.
   const params=new URLSearchParams(location.search);
@@ -79,19 +93,22 @@
   for(const r of document.querySelectorAll('input[name="mode"]'))r.addEventListener('change',()=>{manual=false;$('regen').hidden=true;update();});
   $('budget').addEventListener('change',()=>{manual=false;$('regen').hidden=true;update();});
   $('auto-insert').addEventListener('change',targetState);
-  $('preview').addEventListener('input',()=>{manual=true;$('regen').hidden=false;$('count').textContent=$('preview').value.length.toLocaleString('fr-FR');});
+  $('preview').addEventListener('input',()=>{manual=true;$('regen').hidden=false;size();});
+  $('target').addEventListener('change',size);
   $('regen').onclick=()=>{manual=false;$('regen').hidden=true;update();};
   $('drop-capture').onclick=()=>{capture=null;$('source').hidden=true;$('prefill-note').hidden=true;manual=false;update();};
 
   function record(kind='checkpoint'){
     const now=Date.now(),f=fields(),old=drafts.find(d=>d.id===draftId);
     const title=$('title').value.trim()||f.goal.trim().split('\n')[0].slice(0,60)||'Point de reprise du '+A.dayClock(now);
-    return {id:draftId||String(now),kind:old?.kind||kind,title,source:$('source-platform').value||null,platform:old?.platform||null,
+    return {destUrl:old?.destUrl||null,interrupted:!!old?.interrupted,id:draftId||String(now),kind:old?.kind||kind,title,source:$('source-platform').value||null,platform:old?.platform||null,
       url:capture?.url||old?.url||null,target:$('target').value,fields:f,preview:$('preview').value,createdAt:old?.createdAt||now,updatedAt:now,resetAt:old?.resetAt||null,status:old?.status||'open'};
   }
   async function saveCheckpoint(silent){
     if(!$('preview').value.trim()&&!$('title').value.trim()){if(!silent)$('status').textContent='Rien à enregistrer pour l’instant.';return null;}
-    const r=record(),list=A.cleanCheckpoints(await U.getDrafts()).filter(d=>d.id!==r.id);
+    const r=record();let list=A.cleanCheckpoints(await U.getDrafts()).filter(d=>d.id!==r.id);
+    const int=r.url&&list.find(d=>d.kind==='interruption'&&d.url===r.url&&d.status!=='done');
+    if(int){r.interrupted=true;r.platform=int.platform;r.resetAt=int.resetAt;r.status=int.status;list=list.filter(d=>d.id!==int.id);}
     draftId=r.id;await U.saveDrafts(A.cleanCheckpoints([r,...list]));
     if(!silent)$('status').textContent='Point de reprise enregistré sur cet appareil. Retrouve-le dans la fenêtre AI Flow et le tableau de bord.';
     return r;
@@ -114,7 +131,7 @@
     if(draftId||capture)await saveCheckpoint(true);
     const btn=$('go');btn.disabled=true;$('status').textContent=`Ouverture de ${name(t)}…`;
     try{
-      const r=await A.request('openAndInsert',{platform:t,text,insert:$('auto-insert').checked},{timeout:30000});
+      const r=await A.request('openAndInsert',{platform:t,text,insert:$('auto-insert').checked,checkpointId:draftId||null},{timeout:30000});
       $('status').textContent=r.status==='inserted'?`Inséré dans ${name(t)}. Relis puis envoie toi-même.`
         :r.status==='opened'?`${name(t)} est ouvert. ${copied?'Colle le message (⌘V)':'Copie le message'} puis envoie-le.`
         :`${name(t)} est ouvert, mais l’insertion automatique n’a pas fonctionné${r.status==='draft'?' (un brouillon était déjà présent)':''}. ${copied?'Le message est copié : colle-le (⌘V).':'Copie le message puis colle-le.'} [${r.status}]`;

@@ -1,3 +1,36 @@
+## 0.12.0 — Smart Transfer 2.0, Flow Checkpoints, Flow Recovery, quotas dans la barre de menus
+
+### Nouveau
+- **Continuité intelligente, sans IA ni saisie** : quand tu transfères une conversation, AI Flow remplit seul les rubriques à partir des phrases réelles de la conversation, sans les reformuler : objectif initial, contexte, décisions prises, contraintes (les tiennes uniquement), travail réalisé, **problèmes non résolus** (un problème marqué résolu plus loin n’est pas repris), prochaines étapes, et éléments indispensables (derniers blocs de code, liens cités). Tout reste modifiable.
+- **Transfert complet** : toute la conversation dans l’ordre ; l’IA de destination établit elle-même la synthèse (objectif, décisions, contraintes, fait, bloqué, prochaines étapes) avant de continuer.
+- **Taille estimée** (caractères et jetons) et **avertissement** selon la destination (ChatGPT, Claude).
+- **Pièces jointes** : leur nom est indiqué comme « non transférée », dans l’aperçu et dans un avertissement. Elles ne sont jamais présentées comme transférées.
+- **Points de reprise depuis Claude et ChatGPT** : bouton « Point de reprise » dans la pastille de chaque conversation (lecture sur clic uniquement).
+- **Lien vers la conversation de destination** : après « Ouvrir et insérer », la nouvelle conversation est rattachée au point de reprise (« Continuer sur ChatGPT »).
+- **Flow Recovery** :
+  - quand la limite approche, la pastille propose **discrètement** d’enregistrer un point de reprise (une fois par période, « Plus tard » possible, aucune ouverture automatique) ;
+  - un point de reprise sur une conversation interrompue est marqué « en attente » (fusion, sans doublon) ;
+  - dès que le reset est **confirmé par un relevé**, la notification propose « Reprendre », et **un clic ouvre la conversation**.
+- **Flow Timeline unifiée** :
+  - fenêtre AI Flow : 3 éléments au plus, reprises prêtes d’abord, une action rapide (Reprendre, Continuer, Ouvrir) ;
+  - tableau de bord : liste complète avec Terminé et Supprimer.
+- **Barre de menus macOS** (app AI Flow Dev) : le quota récent le plus contraint à côté de l’icône, et dans le menu chaque quota Claude et Codex avec son reset, le risque éventuel, l’heure de dernière actualisation et la mention « périmé » au-delà de 15 min. Ce sont les mêmes données que la fenêtre et la pastille, envoyées seulement si elles changent et si l’app tourne déjà.
+
+### Tests
+- 88 tests unitaires et de non-régression :
+  - extraction (conversation courte, longue de 600 messages, vide, problème résolu, consigne piégée traitée comme texte) ;
+  - pièces jointes, taille du transfert ;
+  - lien de destination, fusion, reprise confirmée (jamais sur estimation), clic de notification, timeline, suppression, résumé de la barre de menus.
+- 57 vérifications d’intégration dans Chromium avec sites simulés.
+
+### À valider sur ton Mac
+- Lecture des conversations et pièces jointes sur les vrais Claude et ChatGPT (formats internes non documentés).
+- Affichage des quotas dans la barre de menus.
+
+### Non réalisé (et pourquoi)
+- **Raccourci clavier global** : l’app ne peut pas ouvrir la fenêtre de l’extension Safari, donc peu d’intérêt. Reporté.
+- **Nouvelles IA** (Gemini, Cursor, Copilot, Perplexity, Grok) : aucune source de quota fiable et autorisée trouvée (docs/QUOTAS.md). Aucune jauge activée.
+
 ## 0.11.0 — Infrastructure de développement : installer une fois, mettre à jour d’un clic
 
 ### Nouveau

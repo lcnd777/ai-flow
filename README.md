@@ -1,4 +1,4 @@
-# AI Flow — Usage Monitor 0.11.0 (bêta)
+# AI Flow — Usage Monitor 0.12.0 (bêta)
 
 **Never lose your flow to an AI limit.**
 

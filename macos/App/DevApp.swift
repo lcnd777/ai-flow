@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.setActivationPolicy(.accessory)
         awake.onChange = { [weak self] in self?.refreshStatusItem() }
         setUpStatusItem()
+        // Le titre se met à jour chaque minute : une valeur devenue périmée disparaît d'elle-même.
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshStatusItem() }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         // Premier lancement (ou ouverture manuelle) : fenêtre d'accueil pour activer l'extension.
         if !UserDefaults.standard.bool(forKey: "welcomeShown") {
@@ -58,6 +60,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case "awake": awake.set(untilMs: Double(value("until") ?? "") ?? 0)
             case "notify": postNotification(title: value("title") ?? "AI Flow Dev", body: value("body") ?? "")
             case "update": updater.checkForUpdates(nil)
+            case "snapshot":
+                if let d = value("d"), let data = Data(base64URL: d), data.count < 12_000, QuotaSnapshot(data: data) != nil {
+                    UserDefaults.standard.set(data, forKey: QuotaSnapshot.storeKey)
+                    refreshStatusItem()
+                }
             default: break
             }
         }
@@ -111,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: Barre des menus
 
     private func setUpStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu
@@ -123,6 +130,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let button = statusItem?.button else { return }
         let symbol = awake.holding ? "cup.and.saucer.fill" : "bolt.horizontal.circle"
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "AI Flow Dev")
+        button.imagePosition = .imageLeading
+        // Le quota le plus contraint, uniquement s'il est récent (sinon rien : jamais de valeur périmée présentée comme actuelle).
+        button.title = QuotaSnapshot.load()?.headline() ?? ""
         button.toolTip = "AI Flow Dev \(versionText) — \(awake.statusText)"
     }
 
@@ -132,6 +142,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         version.isEnabled = false
         menu.addItem(version)
         menu.addItem(NSMenuItem(title: "Rechercher des mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "u"))
+        menu.addItem(.separator())
+        // Quotas Claude / Codex (mêmes données que la fenêtre de l'extension).
+        if let snap = QuotaSnapshot.load() {
+            for line in snap.menuLines() {
+                let item = NSMenuItem(title: line.text, action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                if line.header { item.attributedTitle = NSAttributedString(string: line.text, attributes: [.font: NSFont.boldSystemFont(ofSize: 13)]) }
+                menu.addItem(item)
+            }
+        } else {
+            let item = NSMenuItem(title: "Quotas : ouvre Claude ou ChatGPT dans Safari", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        }
         menu.addItem(.separator())
         let state = NSMenuItem(title: awake.statusText, action: nil, keyEquivalent: "")
         state.isEnabled = false
@@ -162,5 +186,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
             else { try SMAppService.mainApp.register() }
         } catch { NSLog("AI Flow Dev: élément d'ouverture impossible: \(error.localizedDescription)") }
+    }
+}
+
+// MARK: Quotas reçus de l'extension (barre de menus)
+
+extension Data {
+    init?(base64URL s: String) {
+        var t = s.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while t.count % 4 != 0 { t += "=" }
+        self.init(base64Encoded: t)
+    }
+}
+
+/// Résumé envoyé par l'extension : uniquement des pourcentages lus, leurs dates et l'état. Traité comme des données.
+struct QuotaSnapshot {
+    static let storeKey = "quotaSnapshot"
+    static let staleAfter: TimeInterval = 15 * 60
+    struct Metric { let label: String; let percent: Int; let resetAt: Date?; let observedAt: Date }
+    struct Platform { let name: String; let radar: String; let risk: String; let updatedAt: Date?; let metrics: [Metric] }
+    let platforms: [Platform]
+
+    init?(data: Data) {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let list = obj["platforms"] as? [[String: Any]] else { return nil }
+        let date = { (v: Any?) -> Date? in (v as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) } }
+        platforms = list.prefix(8).compactMap { p in
+            guard let name = p["name"] as? String else { return nil }
+            let metrics = ((p["metrics"] as? [[String: Any]]) ?? []).prefix(8).compactMap { m -> Metric? in
+                guard let label = m["label"] as? String, let pct = m["percent"] as? NSNumber, let seen = date(m["observedAt"]) else { return nil }
+                return Metric(label: String(label.prefix(40)), percent: max(0, min(100, pct.intValue)), resetAt: date(m["resetAt"]), observedAt: seen)
+            }
+            return Platform(name: String(name.prefix(30)), radar: p["radar"] as? String ?? "", risk: String((p["risk"] as? String ?? "").prefix(160)),
+                            updatedAt: date(p["updatedAt"]), metrics: Array(metrics))
+        }
+    }
+    static func load() -> QuotaSnapshot? {
+        guard let data = UserDefaults.standard.data(forKey: storeKey) else { return nil }
+        return QuotaSnapshot(data: data)
+    }
+    private static func fresh(_ m: Metric, now: Date) -> Bool {
+        now.timeIntervalSince(m.observedAt) < staleAfter && (m.resetAt.map { $0 > now } ?? true)
+    }
+    private static func clock(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.timeStyle = .short
+        f.dateStyle = Calendar.current.isDateInToday(d) ? .none : .short
+        return f.string(from: d)
+    }
+    /// « 42 % » : le quota récent le plus utilisé ; vide si aucune donnée récente.
+    func headline(now: Date = Date()) -> String {
+        let freshest = platforms.flatMap { $0.metrics }.filter { Self.fresh($0, now: now) }
+        guard let top = freshest.max(by: { $0.percent < $1.percent }) else { return "" }
+        return " \(top.percent) %"
+    }
+    func menuLines(now: Date = Date()) -> [(text: String, header: Bool)] {
+        var lines: [(text: String, header: Bool)] = []
+        for p in platforms {
+            let state: String
+            switch p.radar {
+            case "available": state = "Disponible"
+            case "near": state = "Proche de la limite"
+            case "reached": state = "Limite atteinte"
+            case "reset-soon": state = "Reset imminent"
+            case "stale": state = "Données périmées"
+            default: state = "Indisponible"
+            }
+            lines.append(("\(p.name) — \(state)", true))
+            for m in p.metrics {
+                let ok = Self.fresh(m, now: now)
+                let reset = m.resetAt.map { $0 > now ? " · reset \(Self.clock($0))" : "" } ?? ""
+                lines.append((ok ? "   \(m.label) : \(m.percent) %\(reset)" : "   \(m.label) : périmé (relevé de \(Self.clock(m.observedAt)))", false))
+            }
+            if !p.risk.isEmpty { lines.append(("   \(p.risk)", false)) }
+            if let u = p.updatedAt { lines.append(("   Actualisé à \(Self.clock(u))", false)) }
+        }
+        return lines
     }
 }

@@ -55,10 +55,10 @@
 
   /* ---------- Relance programmée ---------- */
   const DEFAULT_TEXT='Continue exactement là où tu t’es arrêté.';
-  let awakeInfo={},resumeData={jobs:{},last:null},formOpen=false,form={time:'',text:DEFAULT_TEXT,keepAwake:true,error:''},dismissed={},autoOpenedFor=null,armedInfo=null;
+  let checkpoints=[],awakeInfo={},resumeData={jobs:{},last:null},formOpen=false,form={time:'',text:DEFAULT_TEXT,keepAwake:true,error:''},dismissed={},autoOpenedFor=null,armedInfo=null;
   async function loadAux(){
     try{
-      const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.dismiss,K.toast,K.awake]);awakeInfo=v[K.awake]||{};
+      const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.dismiss,K.toast,K.awake,K.drafts]);awakeInfo=v[K.awake]||{};checkpoints=Array.isArray(v[K.drafts])?v[K.drafts]:[];
       resumeData={jobs:v[K.resume]||{},last:v[K.resumeLast]||null};dismissed=v[K.dismiss]||{};
       const list=(Array.isArray(v[K.toast])?v[K.toast]:[]).filter(t=>t.ts>=loadedAt-60000&&!seenToasts.has(t.id)&&(sitePlatforms.includes(t.platform)||t.type!=='approaching'));
       if(list.length&&!document.hidden){toast=list.at(-1);for(const t of list)seenToasts.add(t.id);}
@@ -152,6 +152,22 @@
     const upd=st.updatedAt?`<div class="tiny ${now-st.updatedAt>A.LATE_MS?'late':''}">${esc(A.updatedText(st.updatedAt,now))}</div>`:`<div class="tiny">Lecture des quotas en cours… vérifie que tu es connecté à ${esc(p.name)}.</div>`;
     return html+(a?`<div class="est">${esc(a)}${run.kind!=='reached'?'<em>estimation</em>':''}</div>`:'')+upd;
   }
+  // Flow Recovery : quand la limite approche, proposer discrètement un point de reprise (une fois par période).
+  function checkpointSuggestion(){
+    const url=PL.conversationOf(location.href)?.url;if(!url||!['claude','chatgpt'].includes(site))return '';
+    const st=A.platformStatus(state,main);
+    if(!['near','reached','reset-soon'].includes(st.radar))return '';
+    if(checkpoints.some(d=>d.url===url&&d.kind==='checkpoint'&&d.status!=='done'))return '';
+    const m=state.metrics[st.worstId],key='cp|'+url+'|'+(m?.resetAt?Math.round(m.resetAt/600000):'x');
+    if(dismissed[key])return '';
+    return `<div class="switch" data-cp-key="${esc(key)}"><b>Point de reprise</b><div class="tiny">${esc(name(main))} ${st.limitReached?'a atteint sa limite':'approche de sa limite'}. Enregistre où tu en es pour continuer plus tard ou sur une autre IA.</div>
+      <div class="acts"><button class="btn" id="cp-save">Enregistrer un point de reprise</button><button class="link" id="cp-later">Plus tard</button></div></div>`;
+  }
+  async function checkpointNow(){
+    // Sur ce clic uniquement : lecture de la conversation ouverte, puis édition du point de reprise.
+    try{await send('captureConversation',{});await send('openPage',{page:'transfer',query:{capture:'1',mode:'checkpoint'}});}
+    catch{send('openPage',{page:'transfer',query:{mode:'checkpoint',from:site}}).catch(()=>{});}
+  }
   function switchBlock(){
     const sw=A.smartSwitch(state,Date.now(),main);
     if(!sw.pressured.length)return '';
@@ -182,8 +198,8 @@
     const t=toast&&!open?`<div class="toast ${esc(toast.type)}" role="status"><b>${esc(toast.title)}</b><div class="tiny">${esc(toast.body)}</div><div class="row">${toast.url?'<button class="btn" id="toast-resume">Reprendre</button>':''}<button class="link" id="toast-open">Voir</button><button class="link" id="toast-close">Fermer</button></div></div>`:'';
     wrapper.innerHTML=`${t}
       <div class="panel ${open?'':'hidden'}" role="region" aria-label="AI Flow"><div class="heading"><b>${logo(site)}AI Flow · ${esc(name(site))}</b><button id="close" class="x" aria-label="Fermer">✕</button></div>
-      ${limitCard()}${switchBlock()}${blocks}${resumeSection()}
-      <div class="actions"><button class="link" data-page="dashboard">Tableau de bord</button><button class="link" id="transfer">Transférer</button><button class="link" data-page="options">Paramètres</button></div></div>
+      ${limitCard()}${checkpointSuggestion()}${switchBlock()}${blocks}${resumeSection()}
+      <div class="actions"><button class="link" data-page="dashboard">Tableau de bord</button><button class="link" id="transfer">Transférer</button>${PL.conversationOf(location.href)&&['claude','chatgpt'].includes(site)?'<button class="link" id="checkpoint">Point de reprise</button>':''}<button class="link" data-page="options">Paramètres</button></div></div>
       <button class="pill" id="toggle" aria-expanded="${open}" aria-label="Afficher AI Flow"><span class="dot ${pl.level}"></span><span>AI Flow</span><span class="summary">${esc(pl.label)}</span><span class="chev">${open?'⌄':'⌃'}</span><span class="grip" title="Déplacer">⠿</span></button>`;
     bind();clampPosition();
   }
@@ -204,6 +220,12 @@
     $('toggle').addEventListener('keydown',e=>{if(e.key==='Escape'){open=false;render();}});
     $('close')?.addEventListener('click',()=>{open=false;render();});
     $('transfer')?.addEventListener('click',()=>handoff());
+    $('checkpoint')?.addEventListener('click',checkpointNow);
+    $('cp-save')?.addEventListener('click',checkpointNow);
+    $('cp-later')?.addEventListener('click',async e=>{
+      const k=e.currentTarget.closest('[data-cp-key]').dataset.cpKey;dismissed[k]=Date.now();
+      try{await A.api.storage.local.set({[K.dismiss]:dismissed});}catch{}render();
+    });
     $('handoff')?.addEventListener('click',()=>handoff());
     $('toast-open')?.addEventListener('click',()=>{toast=null;open=true;render();});
     $('toast-close')?.addEventListener('click',()=>{toast=null;render();});

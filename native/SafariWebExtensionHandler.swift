@@ -55,6 +55,16 @@ enum AIFlowNative {
             return status(["ok": open(host: "update", items: [])])
         case "AI_FLOW_DEV_INFO":
             return status(["ok": true])
+        case "AI_FLOW_SNAPSHOT":
+            // Quotas pour la barre de menus : jamais de lancement de l'app pour ça, taille bornée.
+            guard appRunning else { return status(["ok": false, "error": "app-not-running"]) }
+            guard let snap = message["snapshot"], JSONSerialization.isValidJSONObject(snap),
+                  let data = try? JSONSerialization.data(withJSONObject: snap), data.count < 12_000 else {
+                return ["ok": false, "error": "invalid-snapshot"]
+            }
+            let b64 = data.base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+            return status(["ok": open(host: "snapshot", items: [URLQueryItem(name: "d", value: b64)])])
         default:
             return ["ok": false, "error": "type"]
         }

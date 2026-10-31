@@ -78,8 +78,8 @@ test('notifications : un message par plateforme et par type',()=>{
 test('transfert : message structuré, champs vides ignorés',()=>{
   assert.equal(A.buildHandoff({},'Claude','ChatGPT'),'');
   const t=A.buildHandoff({goal:'Livrer la V1',next:'Écrire les tests',context:'  '},'Claude','ChatGPT');
-  assert.match(t,/commencé sur Claude/);assert.match(t,/## Objectif\nLivrer la V1/);assert.match(t,/## Prochaines actions/);assert.doesNotMatch(t,/Contexte du projet/);
-  assert.ok(t.indexOf('Objectif')<t.indexOf('Prochaines actions'));
+  assert.match(t,/commencé sur Claude/);assert.match(t,/## Objectif initial\nLivrer la V1/);assert.match(t,/## Prochaines étapes/);assert.doesNotMatch(t,/Contexte du projet/);
+  assert.ok(t.indexOf('Objectif')<t.indexOf('Prochaines étapes'));
 });
 test('plateformes : ChatGPT et Codex distincts sur chatgpt.com, conversations reconnues',()=>{
   const P=C.AIFlowPlatforms;

@@ -94,12 +94,10 @@
     if(extras.last)$('jobs').innerHTML+=`<p class="fine">Dernière relance : ${esc(extras.last.status)} · ${esc(A.dayClock(extras.last.at))}</p>`;
     const a=U.awakeText(awake);
     $('awake').innerHTML=`<span>Si le Mac dort</span><b class="${a.cls}">${esc(a.text)}</b>`;
-    const tl=A.cleanCheckpoints(extras.drafts).filter(d=>d.status!=='done'||Date.now()-d.updatedAt<3*86400000);
+    const tl=A.timelineItems(extras.drafts,state);
     $('drafts').innerHTML=tl.length?tl.map(d=>{
-      const pid=d.platform||d.source,st=pid?A.platformStatus(state,pid):null,ok=d.kind==='interruption'&&(d.status==='ready'||(st&&st.fresh.length>0&&!st.limitReached));
-      const what=d.kind==='interruption'?(d.status==='done'?'Repris':ok?`Interrompu · ${A.platform(pid)?.name||''} de nouveau disponible`:`Interrompu par la limite ${A.platform(pid)?.name||''}`):'Point de reprise';
-      return `<div class="cline ${ok?'ready':''} ${d.status==='done'?'done':''}">${U.logo(d.source||'claude','sm')}<div><b>${esc(d.title)}</b><small>${esc(what)} · ${esc(A.dayClock(d.updatedAt))}${d.source?' · '+esc(A.platform(d.source)?.name||''):''}${d.fields?.next?' · Prochaine étape : '+esc(String(d.fields.next).split('\n')[0].slice(0,60)):''}</small></div>
-        ${d.url?`<button class="${ok?'primary':'ghost'} small" data-open-url="${esc(d.id)}">Reprendre</button>`:''}<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>${d.kind==='interruption'?'Transférer':'Ouvrir'}</button><button class="ghost small" data-del="${esc(d.id)}" aria-label="Supprimer">Supprimer</button></div>`;
+      return `<div class="cline ${d.ready?'ready':''}">${U.logo(d.source||'claude','sm')}<div><b>${esc(d.title)}</b><small>${esc(d.label)} · ${esc(A.dayClock(d.updatedAt))}${d.source?' · '+esc(A.platform(d.source)?.name||''):''}${d.fields?.next?' · Prochaine étape : '+esc(String(d.fields.next).replace(/^- /,'').split('\n')[0].slice(0,60)):''}</small></div>
+        ${d.url?`<button class="${d.ready?'primary':'ghost'} small" data-open-url="${esc(d.id)}">Reprendre</button>`:''}${d.destUrl?`<button class="ghost small" data-dest="${esc(d.destUrl)}">Continuer sur ${esc(A.platform(d.target)?.name||'l’autre IA')}</button>`:''}<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>Modifier / transférer</button><button class="ghost small" data-done="${esc(d.id)}">Terminé</button><button class="ghost small" data-del="${esc(d.id)}" aria-label="Supprimer">Supprimer</button></div>`;
     }).join(''):'<p class="fine">Rien pour l’instant. Quand une limite interrompt une conversation, elle apparaît ici, avec « Reprendre » dès que le quota rouvre. Tu peux aussi créer un point de reprise depuis la fenêtre AI Flow.</p>';
   }
   function render(){
@@ -111,6 +109,8 @@
     chart();continuity();U.bindNav(document);
     for(const b of document.querySelectorAll('[data-cancel]'))b.onclick=async()=>{b.disabled=true;try{await A.request('resumeCancel',{id:b.dataset.cancel});}catch{}await reload();};
     for(const b of document.querySelectorAll('[data-del]'))b.onclick=async()=>{if(!confirm('Supprimer ce point de reprise ?'))return;await U.saveDrafts(A.cleanCheckpoints(extras.drafts).filter(d=>d.id!==b.dataset.del));await reload();};
+    for(const b of document.querySelectorAll('[data-dest]'))b.onclick=()=>U.openUrl(b.dataset.dest);
+    for(const b of document.querySelectorAll('[data-done]'))b.onclick=async()=>{const list=A.cleanCheckpoints(extras.drafts),d=list.find(x=>x.id===b.dataset.done);if(!d)return;d.status='done';d.updatedAt=Date.now();await U.saveDrafts(list);await reload();};
     for(const b of document.querySelectorAll('[data-open-url]'))b.onclick=async()=>{const list=A.cleanCheckpoints(extras.drafts),d=list.find(x=>x.id===b.dataset.openUrl);if(!d)return;d.status='done';d.updatedAt=Date.now();await U.saveDrafts(list);await U.openUrl(d.url);await reload();};
   }
   async function reload(){

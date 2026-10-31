@@ -382,14 +382,15 @@
   }
 
   // ---------- Transfert de contexte ----------
-  const HANDOFF_FIELDS=[['goal','Objectif'],['context','Contexte du projet'],['decisions','Décisions déjà prises'],['constraints','Contraintes importantes'],['done','Déjà fait'],['next','Prochaines actions'],['excerpt','Extrait utile de la conversation']];
+  const HANDOFF_FIELDS=[['goal','Objectif initial'],['context','Contexte du projet'],['decisions','Décisions déjà prises'],['constraints','Contraintes importantes'],['done','Travail déjà réalisé'],['problems','Problèmes non résolus'],['next','Prochaines étapes'],['excerpt','Éléments indispensables (code, chiffres, liens)']];
   // Transcript ordonné, borné par un budget de caractères : 1er message (l'objectif) + derniers échanges.
   function buildTranscript(messages,budget=40000,names={}){
     const list=(Array.isArray(messages)?messages:[]).filter(m=>(m?.role==='user'||m?.role==='assistant')&&typeof m.text==='string'&&m.text.trim());
     if(!list.length)return {text:'',included:0,omitted:0,total:0};
     const who=r=>r==='user'?(names.user||'Moi'):(names.assistant||'Assistant');
     const cut=(t,n)=>t.length>n?t.slice(0,n)+`\n[… ${t.length-n} caractères tronqués …]`:t;
-    const fmt=(m,n)=>`**${who(m.role)} :**\n${cut(m.text.trim(),n)}`;
+    const att=m=>Array.isArray(m.attachments)&&m.attachments.length?`\n[Pièce${m.attachments.length>1?'s':''} jointe${m.attachments.length>1?'s':''} non transférée${m.attachments.length>1?'s':''} : ${m.attachments.join(', ')}]`:'';
+    const fmt=(m,n)=>`**${who(m.role)} :**\n${cut(m.text.trim(),n)}${att(m)}`;
     const per=Math.max(1500,Math.floor(budget/4));
     const first=fmt(list[0],Math.min(per,4000));let used=first.length;
     const tail=[];
@@ -403,6 +404,72 @@
     const users=(messages||[]).filter(m=>m?.role==='user'&&m.text?.trim());
     const short=t=>{t=t.trim().replace(/\n{3,}/g,'\n\n');return t.length>600?t.slice(0,600)+'…':t;};
     return {goal:users[0]?short(users[0].text):'',next:users.length>1?short(users.at(-1).text):''};
+  }
+  /* Continuité intelligente, SANS IA : extraction structurée et déterministe à partir des messages.
+     Chaque élément retenu cite la phrase d'origine (rien n'est reformulé ni inventé). Les contenus des
+     conversations sont traités comme des données : ils ne déclenchent jamais d'action. */
+  const RX={
+    decision:/\b(on (garde|part sur|choisit|retient|utilise|reste sur|valide)|j[’']ai (choisi|décidé|tranché)|nous avons (choisi|décidé)|décid[ée]s?|décision|retenu[es]?|validé[es]?|c[’']est validé|ok pour|go pour|we(?:'ll| will)? (use|go with|keep)|decided|let'?s go with|we chose|agreed)\b/i,
+    constraint:/\b(il faut|ne (doit|faut|dois) (pas|jamais)|ne pas|pas de|doit|doivent|obligatoire|impérati(f|vement)|interdit|contrainte|deadline|avant le|au plus tard|maximum|minimum|budget|uniquement|seulement|sans (utiliser|dépendance|frais)|must|must not|should not|do not|don'?t|only|never|required|limit(e|ation)?)\b/i,
+    problem:/\b(erreur|error|bug|ne (fonctionne|marche) (pas|plus)|plante|crash|échou|failed|failing|exception|problème|issue|bloqu|n[’']apparaît pas|introuvable|cassé|broken|doesn'?t work|not working)\b/i,
+    solved:/\b(résolu|corrigé|réglé|ça (marche|fonctionne)|c[’']est bon|fixed|solved|works now|tout est good)\b/i,
+    done:/\b(voici|j[’']ai (ajouté|corrigé|créé|modifié|mis à jour|écrit|implémenté|terminé)|c[’']est fait|terminé|livré|implemented|added|fixed|created|updated|done)\b/i,
+    next:/\b(prochaine[s]? (étape|action)s?|ensuite|à faire|reste à|next steps?|todo|then we|il reste)\b/i
+  };
+  // Limites de mot compatibles avec les accents (\b de JavaScript ignore « é », « è »…).
+  for(const k of Object.keys(RX))RX[k]=new RegExp(RX[k].source.replace(/^\\b/,'(?<![\\p{L}\\p{N}])').replace(/\\b$/,'(?![\\p{L}\\p{N}])'),'iu');
+  const sentences=t=>String(t||'').replace(/```[\s\S]*?```/g,' ').split(/(?<=[.!?])\s+|\n+/).map(x=>x.replace(/^[\s>*#\-–•\d.)]+/,'').trim()).filter(x=>x.length>=12&&x.length<=400);
+  const clip=(t,n=220)=>t.length>n?t.slice(0,n-1)+'…':t;
+  function pick(list,max){const out=[],seen=new Set();for(const x of list){const k=x.toLowerCase().slice(0,80);if(!seen.has(k)){seen.add(k);out.push(x);}if(out.length>=max)break;}return out;}
+  function extractContinuity(messages,meta={}){
+    const list=(Array.isArray(messages)?messages:[]).filter(m=>(m?.role==='user'||m?.role==='assistant')&&typeof m.text==='string'&&m.text.trim());
+    const empty={fields:{},found:0,total:list.length};
+    if(!list.length)return empty;
+    const users=list.filter(m=>m.role==='user'),lastAssistant=[...list].reverse().find(m=>m.role==='assistant');
+    const bullets=s2=>s2.map(x=>'- '+clip(x)).join('\n');
+    const decisions=[],constraints=[],done=[],problems=[];
+    list.forEach((m,i)=>{
+      for(const x of sentences(m.text)){
+        if(RX.decision.test(x))decisions.push(x);
+        if(m.role==='user'&&RX.constraint.test(x))constraints.push(x);
+        if(m.role==='assistant'&&RX.done.test(x))done.push(x);
+        if(RX.problem.test(x)){
+          // Problème non résolu : aucun message ultérieur n'annonce de résolution.
+          const later=list.slice(i+1).some(n=>RX.solved.test(n.text));
+          if(!later)problems.push(x);
+        }
+      }
+    });
+    // Prochaines étapes : la dernière demande, puis les listes « prochaines étapes » de la dernière réponse.
+    const next=[];
+    if(users.length>1)next.push('Dernière demande : '+clip(users.at(-1).text.trim().replace(/\s+/g,' '),400));
+    if(lastAssistant){
+      const lines=lastAssistant.text.split('\n'),start=lines.findIndex(l=>RX.next.test(l));
+      if(start>=0)for(const l of lines.slice(start+1,start+12)){const t=l.replace(/^[\s*\-–•\d.)]+/,'').trim();if(/^[\s]*([*\-–•]|\d+[.)])\s+/.test(l)&&t)next.push(t);else if(next.length>1&&!t)break;}
+    }
+    // Éléments indispensables : derniers blocs de code et liens cités.
+    const code=[];for(const m of [...list].reverse()){for(const c of m.text.match(/```[\s\S]*?```/g)||[]){if(code.length<2)code.unshift(c.length>4000?c.slice(0,4000)+'\n…```':c);}if(code.length>=2)break;}
+    const links=pick([...new Set(list.flatMap(m=>m.text.match(/https?:\/\/[^\s)>\]"']+/g)||[]))].reverse(),8);
+    const fields={
+      goal:users[0]?clip(users[0].text.trim().replace(/\n{3,}/g,'\n\n'),700):'',
+      context:[meta.title?`Conversation « ${meta.title} »`:'',meta.source?`sur ${meta.source}`:'',`${list.length} messages`].filter(Boolean).join(' ')+'.',
+      decisions:bullets(pick(decisions.reverse(),8).reverse()),
+      constraints:bullets(pick(constraints,8)),
+      done:bullets(pick(done.reverse(),6).reverse()),
+      problems:bullets(pick(problems.reverse(),5).reverse()),
+      next:next.length?bullets(pick(next,8)):'',
+      excerpt:[...code,links.length?'Liens cités :\n'+links.map(l=>'- '+l).join('\n'):''].filter(Boolean).join('\n\n')
+    };
+    for(const k of Object.keys(fields))fields[k]=fields[k].replace(/^- /gm,'- ').trim();
+    const found=['decisions','constraints','done','problems','next','excerpt'].filter(k=>fields[k]).length;
+    return {fields,found,total:list.length};
+  }
+  // Taille estimée d'un transfert et adéquation à la destination (ordre de grandeur, ~4 caractères par jeton).
+  const DEST_LIMITS={claude:{ok:120000,max:200000},chatgpt:{ok:30000,max:100000}};
+  function estimateTransfer(text,target){
+    const chars=String(text||'').length,tokens=Math.ceil(chars/4),l=DEST_LIMITS[target]||DEST_LIMITS.chatgpt;
+    const level=chars<=l.ok?'ok':chars<=l.max?'large':'too-large';
+    return {chars,tokens,level};
   }
   function buildHandoff(f,sourceName,targetName,transcript=''){
     const parts=[];
@@ -425,12 +492,31 @@
         source:PL.get(d.source)?d.source:conv?.platform||null,platform:PL.get(d.platform)?d.platform:null,url:conv?conv.url:null,target:PL.get(d.target)?d.target:null,
         fields:d.fields&&typeof d.fields==='object'?d.fields:{},preview:typeof d.preview==='string'?d.preview.slice(0,200000):'',
         createdAt:Number.isFinite(d.createdAt)?d.createdAt:Date.now(),updatedAt:Number.isFinite(d.updatedAt)?d.updatedAt:(Number.isFinite(d.createdAt)?d.createdAt:Date.now()),
-        resetAt:Number.isFinite(d.resetAt)?d.resetAt:null,status:['open','ready','done'].includes(d.status)?d.status:'open'});
+        resetAt:Number.isFinite(d.resetAt)?d.resetAt:null,status:['open','ready','waiting','done'].includes(d.status)?d.status:'open',
+        destUrl:PL.conversationOf(d.destUrl||'')?.url||null,interrupted:d.kind==='interruption'||d.interrupted===true});
     }
     return out.sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,50);
   }
 
 
+  // Flow Timeline : statut lisible et ordre (reprises prêtes d'abord, puis interrompues, puis récentes).
+  function timelineItems(list,state,now=Date.now()){
+    return cleanCheckpoints(list).filter(d=>d.status!=='done').map(d=>{
+      const pid=d.platform||d.source,st=pid&&PL.get(pid)?platformStatus(state,pid==='chatgpt'?'codex':pid,now):null;
+      const ready=d.interrupted&&(d.status==='ready'||(st&&st.fresh.length>0&&!st.limitReached));
+      const label=d.interrupted?(ready?`${PL.get(pid)?.name||''} de nouveau disponible`:`En attente : limite ${PL.get(pid)?.name||''}${d.resetAt&&d.resetAt>now?` · rouvre ${dayClock(d.resetAt,now)}`:''}`):d.destUrl?`Poursuivi sur ${PL.get(d.target)?.name||'une autre IA'}`:'Point de reprise';
+      return {...d,ready,label,rank:ready?0:d.interrupted?1:2};
+    }).sort((a,b)=>a.rank-b.rank||b.updatedAt-a.updatedAt);
+  }
+  // Résumé pour la barre de menus macOS : uniquement des chiffres lus, leurs dates et l'état ; aucun contenu.
+  function menuSnapshot(state,now=Date.now()){
+    return {v:1,at:now,platforms:visiblePlatforms(state).filter(pid=>PL.get(pid).support!=='none').map(pid=>{
+      const st=platformStatus(state,pid,now),run=platformRunway(state,pid,now);
+      return {id:pid,name:PL.get(pid).name,radar:st.radar,updatedAt:st.updatedAt,
+        risk:runwayWorthShowing(run)&&['risk','risk-uncertain','reached'].includes(run.kind)?runwayText(run,now):'',
+        metrics:st.ids.filter(id=>state.metrics[id]).map(id=>{const m=state.metrics[id];return {label:METRICS[id].short,percent:Math.round(m.percent),resetAt:m.resetAt||null,observedAt:m.observedAt};})};
+    })};
+  }
   function formatReset(resetAt,now=Date.now()){
     if(!resetAt)return 'Reset non communiqué';const min=Math.ceil((resetAt-now)/60000);
     if(min<=0)return 'Reset à confirmer';if(min<60)return `Reset dans ${min} min`;
@@ -453,5 +539,5 @@
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
     runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,smartSwitch,notificationEvents,describeEvents,
-    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,cleanCheckpoints,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
+    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,cleanCheckpoints,timelineItems,menuSnapshot,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

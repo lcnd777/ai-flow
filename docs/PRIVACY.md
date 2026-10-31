@@ -13,5 +13,6 @@
 - **Contenu des conversations** : lu uniquement sur ton clic (« Transférer cette conversation », « Point de reprise »), pour l’onglet affiché seulement. Il reste en mémoire de la page de transfert et n’est conservé que si tu enregistres un point de reprise. AI Flow ne parcourt jamais tes autres conversations.
 - **Jamais transmis** à un serveur AI Flow : il n'y en a pas. Les seules requêtes réseau sont les lectures de quota, faites par ton propre onglet vers la plateforme elle-même.
 - **Transfert** : le message est copié dans ton presse-papiers et, si tu le choisis, inséré dans la zone de saisie de l’autre IA, **sans jamais être envoyé** à ta place.
-- **App Mac** : elle reçoit seulement l'heure de fin du maintien éveillé et le texte des notifications. Le lien local `aiflow://` ne sort pas du Mac.
+- **App Mac** : elle reçoit l’heure de fin du maintien éveillé, le texte des notifications et, pour la barre de menus, un résumé des quotas (pourcentages, dates de reset, état). Aucun contenu de conversation. Le lien local `aiflow://` ou `aiflow-dev://` ne sort pas du Mac.
+- **Pièces jointes** : seuls leurs noms sont lus (pour te signaler qu’elles ne sont pas transférées) ; leur contenu n’est jamais récupéré.
 - **Effacement** : Paramètres › Données (relevés, historique). Les reprises se suppriment depuis le tableau de bord. Désinstaller l'extension efface tout.
