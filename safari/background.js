@@ -1,6 +1,7 @@
 /* Sole writer. Claude GET-only quota connector is opt-in; Codex uses visible official usage tabs. */
 if(typeof importScripts==='function')importScripts('shared.js','usage-parser.js','claude-api.js','codex-api.js');
 const A=globalThis.AIFlow,P=globalThis.AIFlowUsage,C=globalThis.AIFlowClaudeAPI,CD=globalThis.AIFlowCodexAPI,api=A.api;
+const AUTO_KEY='ai_flow_auto_refresh_v1',AUTO_MIN_GAP=60000,ALARM_MINUTES=2;
 const ALERT_KEY='ai_flow_alerts_v3',TRACKER_KEY='ai_flow_trackers_v3',DIAG_KEY='ai_flow_diagnostics_v1',CLAUDE_ORG_KEY='ai_flow_claude_org_v1';
 let queue=Promise.resolve();
 function serial(job){const result=queue.catch(()=>{}).then(job);queue=result.catch(()=>{});return result;}
@@ -17,6 +18,10 @@ function authorized(message,sender){
   const provider=P.providerFor(url);
   if(message.op==='metrics'&&provider&&Array.isArray(message.payload)&&message.payload.length<=8&&message.payload.every(m=>A.METRICS[m?.id]?.provider===provider&&m.source==='observed'))return;
   if(message.op==='connector'&&provider&&message.payload?.provider===provider)return;
+  // Auto-refresh: a page may only ask for its own provider; throttled in autoRefresh().
+  if(message.op==='autoRefresh'&&message.payload?.provider===(site.hostname==='claude.ai'?'claude':'codex'))return;
+  // Scheduled resume: armed/cancelled only by an explicit click in the page widget.
+  if(message.op==='resumeArm'||message.op==='resumeCancel')return;
   throw Error('Commande non autorisée depuis cette page');
 }
 async function trackers(){return (await api.storage.local.get(TRACKER_KEY))[TRACKER_KEY]||{};}
@@ -109,8 +114,7 @@ async function readClaudeWithFallback(){
 }
 async function refreshCodexViaTab(){
   let tabs=[];try{tabs=await api.tabs.query({});}catch{}
-  const tab=tabs.find(t=>/^https:\/\/chatgpt\.com(?:\/|$)/.test(t.url||'')&&t.status==='complete')||
-    tabs.find(t=>/^https:\/\/chatgpt\.com(?:\/|$)/.test(t.url||''));
+  const tab=existingCodexTab(tabs);
   if(!tab?.id)return {status:'no-tab',stage:'codex-page'};
   if(!api.scripting?.executeScript)return {status:'scripting-unavailable',stage:'codex-page'};
   try{
@@ -122,6 +126,41 @@ async function refreshCodexViaTab(){
     if(isGoodClaudeRead(result)&&!readings.length)return {status:'invalid-result',stage:'codex-page'};
     return {...result,readings};
   }catch{return {status:'injection-failed',stage:'codex-page'};}
+}
+function existingCodexTab(tabs){
+  return tabs.find(t=>/^https:\/\/chatgpt\.com(?:\/|$)/.test(t.url||'')&&t.status==='complete')||
+    tabs.find(t=>/^https:\/\/chatgpt\.com(?:\/|$)/.test(t.url||''))||null;
+}
+// Automatic refresh without any click. Only reuses tabs the user already has
+// open (never opens or reloads a tab), is throttled per provider, and respects
+// an explicit "Arrêter" from the dashboard.
+async function autoRefresh(providers,force=false){
+  const saved=(await api.storage.local.get(AUTO_KEY))[AUTO_KEY]||{};
+  const last=saved.last||{},disabled=saved.disabled||{},now=Date.now(),todo=[];
+  for(const p of providers){
+    if(disabled[p])continue;
+    if(!force&&now-(last[p]||0)<AUTO_MIN_GAP)continue;
+    last[p]=now;todo.push(p);
+  }
+  if(!todo.length)return {skipped:true};
+  await api.storage.local.set({[AUTO_KEY]:{...saved,last}});
+  let tabs=[];try{tabs=await api.tabs.query({});}catch{}
+  const out={};
+  for(const p of todo){
+    if(p==='claude'){
+      if(!tabs.some(t=>/^https:\/\/claude\.ai(?:\/|$)/.test(t.url||'')))continue;
+      out.claude=await refreshClaude();
+    }else if(p==='codex'){
+      if(!existingCodexTab(tabs))continue;
+      const r=await refreshCodex();out.codex={status:r.status,readings:r.readings?.length||0};
+    }
+  }
+  return out;
+}
+async function setAutoDisabled(provider,value){
+  const saved=(await api.storage.local.get(AUTO_KEY))[AUTO_KEY]||{};
+  const disabled={...(saved.disabled||{})};if(value)disabled[provider]=true;else delete disabled[provider];
+  await api.storage.local.set({[AUTO_KEY]:{...saved,disabled}});
 }
 async function refreshCodex(){
   const result=await refreshCodexViaTab();await saveDiagnostic('codex',result);
@@ -183,6 +222,7 @@ async function openClaudePageFallback(result){
 }
 async function startTracker(provider){
   if(!Object.hasOwn(A.USAGE_URLS,provider))throw Error('Plateforme inconnue');
+  await setAutoDisabled(provider,false);
   const records=await trackers();
   if(provider==='claude'){
     // Only one explicit activation; don't retry an API that Safari consistently
@@ -227,6 +267,7 @@ async function startTracker(provider){
 }
 async function stopTracker(provider){
   if(!Object.hasOwn(A.USAGE_URLS,provider))throw Error('Plateforme inconnue');
+  await setAutoDisabled(provider,true);
   const records=await trackers(),entry=records[provider],tab=await ownedTab(provider,entry);delete records[provider];await api.storage.local.set({[TRACKER_KEY]:records});
   if(tab?.pinned)await api.tabs.update(tab.id,{pinned:false});
   if(tab&&entry?.createdByExtension===true)await api.tabs.remove(tab.id);
@@ -306,6 +347,125 @@ async function openDashboardTab(){
 if(api.action?.onClicked?.addListener){
   api.action.onClicked.addListener(()=>{openDashboardTab().catch(e=>console.warn('AI Flow dashboard:',e.message));});
 }
+/* ---------- Relance programmée : activée par l'utilisateur, un seul envoi, annulable ---------- */
+const RESUME_KEY='ai_flow_resume_v1',RESUME_LAST_KEY='ai_flow_resume_last_v1',RESUME_MAX_ATTEMPTS=12,RESUME_MAX_TEXT=2000;
+const CONVERSATION_PATH={claude:/^\/chat\/[\w-]+\/?$/,chatgpt:/^\/(?:g\/[\w-]+\/)?c\/[\w-]+\/?$/};
+function conversationOf(url){
+  let u;try{u=new URL(url||'');}catch{return null;}
+  if(u.protocol!=='https:')return null;
+  const provider=u.hostname==='claude.ai'?'claude':u.hostname==='chatgpt.com'?'chatgpt':null;
+  if(!provider||!CONVERSATION_PATH[provider].test(u.pathname))return null;
+  return {provider,url:u.origin+u.pathname.replace(/\/$/,'')};
+}
+async function resumeJobs(){return (await api.storage.local.get(RESUME_KEY))[RESUME_KEY]||{};}
+async function saveResumeJobs(jobs){await api.storage.local.set({[RESUME_KEY]:jobs});}
+function hasNative(){return !!api.runtime.getManifest?.().permissions?.includes('nativeMessaging');}
+async function nativeSend(message){
+  if(!hasNative())return false;
+  try{const reply=await api.runtime.sendNativeMessage('ai.flow',message);return !!reply?.ok;}catch{return false;}
+}
+// Asks the AI Flow Mac app to prevent idle sleep until the latest armed resume (+15 min).
+async function syncKeepAwake(jobs){
+  const times=Object.values(jobs).filter(j=>j.keepAwake).map(j=>j.at);
+  return nativeSend({type:'AI_FLOW_KEEP_AWAKE',until:times.length?Math.max(...times)+15*60000:0});
+}
+async function resumeArm(payload,sender){
+  const conv=conversationOf(sender.url);
+  if(!conv||sender.tab?.id==null)throw Error('Ouvre la conversation à relancer, puis réessaie.');
+  const text=typeof payload?.message==='string'?payload.message.trim():'';
+  if(!text||text.length>RESUME_MAX_TEXT)throw Error('Message de relance vide ou trop long.');
+  const at=Number(payload?.at),now=Date.now();
+  if(!Number.isFinite(at)||at<now+30000||at>now+8*86400000)throw Error('Heure de relance invalide.');
+  const jobs=await resumeJobs();
+  for(const [k,j] of Object.entries(jobs))if(j.url===conv.url){delete jobs[k];try{await api.alarms.clear('ai-flow-resume:'+k);}catch{}}
+  const id=String(now);
+  jobs[id]={id,provider:conv.provider,url:conv.url,tabId:sender.tab.id,message:text,at,keepAwake:!!payload.keepAwake,attempts:0,status:'armed',armedAt:now};
+  await saveResumeJobs(jobs);
+  await api.alarms.create('ai-flow-resume:'+id,{when:at});
+  if(jobs[id].keepAwake){jobs[id].awakeOk=await syncKeepAwake(jobs);await saveResumeJobs(jobs);}
+  return {id,at,awakeOk:jobs[id].awakeOk??null};
+}
+async function resumeCancel(id){
+  const jobs=await resumeJobs();if(!jobs[id])return false;
+  delete jobs[id];await saveResumeJobs(jobs);
+  try{await api.alarms.clear('ai-flow-resume:'+id);}catch{}
+  await syncKeepAwake(jobs);return true;
+}
+// Self-contained: injected into the conversation tab. Never overwrites a draft.
+async function injectResume(text,provider){
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const pick=list=>{for(const s of list){const el=document.querySelector(s);if(el)return el;}return null;};
+  const composer=provider==='claude'
+    ?pick(['div.ProseMirror[contenteditable="true"]','[data-testid="chat-input"] [contenteditable="true"]','fieldset [contenteditable="true"]'])
+    :pick(['#prompt-textarea','div.ProseMirror[contenteditable="true"]','form textarea']);
+  if(!composer)return {status:'no-composer'};
+  const read=()=>composer.tagName==='TEXTAREA'?composer.value:composer.textContent;
+  if((read()||'').trim())return {status:'draft'};
+  composer.focus();
+  if(composer.tagName==='TEXTAREA'){
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(composer,text);
+    composer.dispatchEvent(new Event('input',{bubbles:true}));
+  }else if(!document.execCommand('insertText',false,text)){
+    composer.textContent=text;composer.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));
+  }
+  const sendSel=provider==='claude'
+    ?['button[aria-label="Send message"]','button[aria-label="Envoyer le message"]','button[aria-label*="Send" i]','fieldset button[type="submit"]']
+    :['button[data-testid="send-button"]','#composer-submit-button','button[aria-label*="Send" i]','button[aria-label*="Envoyer" i]'];
+  let btn=null;
+  for(let i=0;i<15;i++){btn=pick(sendSel);if(btn&&!btn.disabled)break;await sleep(200);}
+  if(btn&&!btn.disabled)btn.click();
+  else composer.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true,cancelable:true}));
+  await sleep(800);
+  return {status:(read()||'').trim()?'not-sent':'sent'};
+}
+const RESUME_LABELS={sent:'envoyée',draft:'annulée : un brouillon était en cours','no-composer':'zone de saisie introuvable','not-sent':'message non parti','injection-failed':'onglet inaccessible','quota-plein':'quota encore plein',chargement:'page en chargement','ouverture-onglet':'réouverture de la conversation'};
+async function fireResume(id){
+  const job=(await resumeJobs())[id];if(!job)return;
+  const finish=async(status)=>{
+    const all=await resumeJobs();delete all[id];await saveResumeJobs(all);await syncKeepAwake(all);
+    await api.storage.local.set({[RESUME_LAST_KEY]:{url:job.url,status,at:Date.now()}});
+    await nativeSend({type:'AI_FLOW_NOTIFY',title:'AI Flow · Relance '+(status==='envoyée'?'envoyée':'non envoyée'),body:(job.provider==='claude'?'Claude':'ChatGPT')+' : '+status});
+  };
+  const retry=async(status,minutes)=>{
+    const all=await resumeJobs(),j=all[id];if(!j)return;
+    j.attempts=(j.attempts||0)+1;j.status=RESUME_LABELS[status]||status;
+    if(j.attempts>=RESUME_MAX_ATTEMPTS)return finish('abandonnée ('+j.status+')');
+    j.at=Date.now()+minutes*60000;await saveResumeJobs(all);
+    await api.alarms.create('ai-flow-resume:'+id,{when:j.at});
+    if(j.keepAwake)await syncKeepAwake(all);
+  };
+  // 1. Is the session really open again? Claude exposes a reliable counter; ChatGPT does not.
+  if(job.provider==='claude'){
+    const r=await refreshClaude();
+    const s=(await A.getState()).metrics['claude.session'];
+    if(isGoodClaudeRead(r)&&s&&s.percent>=99.5)return retry('quota-plein',5);
+  }
+  // 2. Find the conversation tab (IDs change after a restart), or reopen it.
+  let tab=null;try{tab=await api.tabs.get(job.tabId);}catch{}
+  if(!tab||conversationOf(tab.url)?.url!==job.url){
+    let all=[];try{all=await api.tabs.query({});}catch{}
+    tab=all.find(t=>conversationOf(t.url)?.url===job.url)||null;
+  }
+  if(!tab){
+    const created=await api.tabs.create({url:job.url,active:true});
+    const all=await resumeJobs();if(all[id]){all[id].tabId=created.id;await saveResumeJobs(all);}
+    return retry('ouverture-onglet',1);
+  }
+  if(tab.status==='loading')return retry('chargement',1);
+  try{await api.tabs.update(tab.id,{active:true});if(tab.windowId!=null&&api.windows?.update)await api.windows.update(tab.windowId,{focused:true});}catch{}
+  // 3. Send once.
+  let result;
+  try{const frames=await api.scripting.executeScript({target:{tabId:tab.id},func:injectResume,args:[job.message,job.provider]});result=frames?.[0]?.result;}
+  catch{result={status:'injection-failed'};}
+  if(result?.status==='sent')return finish('envoyée');
+  if(result?.status==='draft')return finish(RESUME_LABELS.draft);
+  return retry(result?.status||'injection-failed',2);
+}
+async function restoreResumeAlarms(){
+  const jobs=await resumeJobs();
+  for(const id of Object.keys(jobs))if(!await api.alarms.get('ai-flow-resume:'+id))await api.alarms.create('ai-flow-resume:'+id,{when:Math.max(jobs[id].at,Date.now()+5000)});
+  if(Object.keys(jobs).length)await syncKeepAwake(jobs);
+}
 async function handle(message,sender){
   authorized(message,sender);
   const {op,payload}=message;
@@ -317,7 +477,10 @@ async function handle(message,sender){
   if(op==='trackerStop')return stopTracker(payload?.provider);
   if(op==='trackerStatus')return trackers();
   if(op==='diagnostics')return (await api.storage.local.get(DIAG_KEY))[DIAG_KEY]||{};
-  if(op==='refresh'){await pollTrackers();return true;}
+  if(op==='refresh'){await pollTrackers();await autoRefresh(['claude','codex'],true);return true;}
+  if(op==='autoRefresh'){const p=payload?.provider;return autoRefresh(p?[p]:['claude','codex']);}
+  if(op==='resumeArm')return resumeArm(payload,sender);
+  if(op==='resumeCancel')return resumeCancel(String(payload?.id||''));
   if(op==='clear')await api.storage.local.set({[ALERT_KEY]:{},[DIAG_KEY]:{},[CLAUDE_ORG_KEY]:null});
   const value=await write(op,payload);
   const senderIsClaudeUsage=sender.tab&&P.providerFor(sender.url)==='claude';
@@ -334,7 +497,14 @@ api.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message?.type!=='AI_FLOW')return false;
   serial(()=>handle(message,sender)).then(value=>reply({ok:true,value}),error=>reply({ok:false,error:error.message}));return true;
 });
-api.alarms.onAlarm.addListener(alarm=>alarm.name==='ai-flow-refresh'?serial(async()=>{await pollTrackers();await refresh();}):undefined);
+api.alarms.onAlarm.addListener(alarm=>alarm.name==='ai-flow-refresh'?serial(async()=>{
+  await pollTrackers();
+  // Providers without an explicit tracker are refreshed from any open tab.
+  const records=await trackers();
+  await autoRefresh(['claude','codex'].filter(p=>!records[p]));
+  await refresh();
+}):undefined);
+api.alarms.onAlarm.addListener(alarm=>{if(alarm.name.startsWith('ai-flow-resume:'))serial(()=>fireResume(alarm.name.slice('ai-flow-resume:'.length)));});
 api.tabs.onUpdated?.addListener((tabId,change,tab)=>{
   if(change.status!=='complete')return;
   serial(async()=>{
@@ -373,7 +543,10 @@ api.tabs.onRemoved.addListener(tabId=>serial(async()=>{
 }));
 async function install(){
   // Workers wake for each message: replacing an existing alarm would postpone it forever.
-  if(!await api.alarms.get('ai-flow-refresh'))await api.alarms.create('ai-flow-refresh',{periodInMinutes:5});
+  // Recreate only if missing or on an old period (one-time migration from 5 min).
+  const alarm=await api.alarms.get('ai-flow-refresh');
+  if(!alarm||alarm.periodInMinutes!==ALARM_MINUTES)await api.alarms.create('ai-flow-refresh',{periodInMinutes:ALARM_MINUTES});
+  await restoreResumeAlarms();
   await refresh();await syncMenu();
 }
 api.runtime.onInstalled.addListener(()=>serial(install));

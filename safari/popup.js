@@ -112,6 +112,9 @@
   });
   $('refresh').addEventListener('click',async()=>{try{await A.request('refresh');$('connector-notice').textContent='Actualisation demandée aux connecteurs actifs.';await renderDiagnostics();}catch(e){$('connector-notice').textContent=e.message;}});
   render();updateConnections();renderDiagnostics();
+  // Automatic refresh on opening: no need to click « Vérifier ».
+  A.request('autoRefresh',{}).then(async()=>{state=await A.getState();render();renderDiagnostics();},()=>{});
+  setInterval(()=>{A.request('autoRefresh',{}).catch(()=>{});},60000);
   $('save').addEventListener('click',async()=>{
     const id=$('metric-id').value,pct=Number($('percent').value),raw=$('reset').value;
     const status=$('form-status');status.classList.remove('error');

@@ -2,12 +2,13 @@
   "manifest_version": 3,
   "name": "AI Flow — Usage Monitor",
   "short_name": "AI Flow",
-  "version": "0.6.4",
+  "version": "0.7.0",
   "description": "Suivi transparent des quotas Claude et ChatGPT, alertes facultatives et prévision de session. Stockage local.",
   "permissions": [
     "storage",
     "alarms",
-    "scripting"
+    "scripting",
+    "nativeMessaging"
   ],
   "action": {
     "default_title": "AI Flow — Quotas IA",
@@ -60,5 +61,5 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
   },
-  "version_name": "0.6.4 first-party sign-in UX and verified quota states"
+  "version_name": "0.7.0"
 }
