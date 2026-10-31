@@ -2,6 +2,7 @@
   'use strict';
   const A=window.AIFlow,U=window.AIFlowUI,PL=window.AIFlowPlatforms,$=id=>document.getElementById(id),esc=A.escapeHTML;
   let state,conn={},extras={jobs:{},drafts:[]},awake=null,active=null,busy='';
+  {const m=A.api.runtime.getManifest();if(/dev/i.test(m.version_name||''))$('ver').textContent=m.version_name;}
   try{state=await A.getState();}catch(e){$('platforms').textContent=e.message;return;}
   // Onglet actif : quelle IA j'utilise en ce moment ?
   try{
