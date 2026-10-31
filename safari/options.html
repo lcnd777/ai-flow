@@ -61,6 +61,22 @@
       <div class="row-actions"><button type="button" id="export" class="ghost small">Exporter l’historique (JSON)</button><button type="button" id="clear-history" class="ghost small">Effacer l’historique</button><button type="button" id="clear" class="danger small">Supprimer tous les relevés</button></div>
       <p id="notice" class="fine" role="status"></p>
     </section>
+    <section class="panel" id="dev"><div class="sec-head"><h2>Version et mises à jour</h2><span id="channel" class="tag"></span></div>
+      <div class="kv"><span>Version installée</span><b id="dev-version">…</b></div>
+      <p class="fine" id="dev-note"></p>
+      <div class="row-actions">
+        <button type="button" id="dev-update" class="primary small">Rechercher une mise à jour</button>
+        <button type="button" id="dev-reload" class="ghost small">Recharger l’extension</button>
+      </div>
+      <h3>Sauvegarde de mes données</h3>
+      <p class="fine">Réglages, historique, points de reprise et relances, dans un seul fichier. Sert une seule fois, pour passer de l’extension temporaire à l’app AI Flow Dev sans rien perdre. Les mises à jour suivantes conservent tout automatiquement.</p>
+      <div class="row-actions">
+        <button type="button" id="data-export" class="ghost small">Sauvegarder mes données</button>
+        <button type="button" id="data-import" class="ghost small">Restaurer une sauvegarde…</button>
+        <input type="file" id="data-file" accept="application/json,.json" hidden>
+      </div>
+      <p class="fine" id="dev-status" role="status"></p>
+    </section>
     <p class="fine center" id="version"></p>
   </main>
   <script src="platforms.js"></script><script src="shared.js"></script><script src="ui.js"></script><script src="options.js"></script>

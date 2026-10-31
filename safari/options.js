@@ -101,6 +101,35 @@
   };
   $('clear-history').onclick=async()=>{if(!confirm('Effacer l’historique de consommation ?'))return;try{await A.request('clearHistory');notice('Historique effacé.');}catch(e){notice(e.message);}};
   $('clear').onclick=async()=>{if(!confirm('Supprimer tous les relevés, l’historique et les diagnostics ?'))return;try{await A.request('clear');state=await A.getState();render();notice('Relevés supprimés. Ils reviendront à la prochaine lecture d’un onglet ouvert.');}catch(e){notice(e.message);}};
+  // Version et mises à jour
+  async function dev(){
+    try{
+      const d=await A.request('devInfo',null,{timeout:5000});
+      $('dev-version').textContent=d.versionName+(d.appBuild?` · app build ${d.appBuild}`:'');
+      $('channel').textContent=d.channel==='dev'?'canal de développement':'version publique';
+      $('dev-update').hidden=!d.native;
+      $('dev-note').textContent=d.native?'Les nouvelles versions arrivent automatiquement : l’app AI Flow Dev vérifie toutes les heures et propose « Installer et relancer ». Tu peux aussi vérifier maintenant.'
+        :'Extension chargée sans l’app AI Flow Dev (extension temporaire ou Chrome/Edge) : pas de mise à jour automatique ici. Installe l’app une fois (docs/DEV-WORKFLOW.md).';
+    }catch(e){$('dev-version').textContent=manifest.version_name||manifest.version;}
+  }
+  $('dev-update').onclick=async()=>{try{await A.request('devCheckUpdate',null,{timeout:8000});$('dev-status').textContent='Recherche lancée : la fenêtre de mise à jour de l’app AI Flow Dev va s’ouvrir.';}catch(e){$('dev-status').textContent=e.message;}};
+  $('dev-reload').onclick=async()=>{$('dev-status').textContent='Rechargement…';try{await A.request('reload',null,{timeout:3000});}catch{}setTimeout(()=>location.reload(),1200);};
+  $('data-export').onclick=async()=>{
+    try{const b=await A.request('exportData');const blob=new Blob([JSON.stringify(b,null,2)],{type:'application/json'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`AI-Flow-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+      $('dev-status').textContent=`Sauvegarde créée (${Object.keys(b.data).length} éléments). Restaure-la dans la nouvelle installation.`;}
+    catch(e){$('dev-status').textContent=e.message;}
+  };
+  $('data-import').onclick=()=>$('data-file').click();
+  $('data-file').onchange=async()=>{
+    const f=$('data-file').files[0];if(!f)return;
+    try{const b=JSON.parse(await f.text());
+      if(!confirm('Restaurer cette sauvegarde ? Les données actuelles d’AI Flow seront remplacées par celles du fichier.'))return;
+      const r=await A.request('importData',b);$('dev-status').textContent=`Sauvegarde restaurée (${r.keys} éléments).`;state=await A.getState();render();}
+    catch(e){$('dev-status').textContent=e instanceof SyntaxError?'Ce fichier n’est pas une sauvegarde AI Flow.':e.message;}
+    finally{$('data-file').value='';}
+  };
+  dev();
   async function reload(){try{state=await A.getState();}catch{}auto=(await U.loadExtras()).auto;try{conn=await A.request('connectionStatuses');}catch{}render();}
   U.bindNav(document);render();await reload();awake();
   U.live(()=>{if(!document.activeElement?.closest?.('.prow'))reload();});

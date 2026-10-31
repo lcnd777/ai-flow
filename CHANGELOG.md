@@ -1,3 +1,25 @@
+## 0.11.0 — Infrastructure de développement : installer une fois, mettre à jour d’un clic
+
+### Nouveau
+- **App macOS de développement « AI Flow Dev »** (`macos/`) : app de barre de menus qui contient l’extension Safari. Elle est persistante (fini l’extension temporaire) et a des identifiants stables, séparés de la future version publique (`ai.flow.dev`, `ai.flow.dev.Extension`, `aiflow-dev://`). Elle reprend Awake et les notifications, avec une fenêtre d’accueil pour activer l’extension.
+- **Mises à jour par Sparkle 2** : vérification au lancement puis toutes les heures, et « Installer et relancer ». Chaque archive est signée Ed25519 ; une archive modifiée ou signée par une autre clé est refusée.
+- **Compilation dans le cloud** (`.github/workflows/dev-macos.yml`) : tests, XcodeGen, compilation sur un Mac GitHub avec Xcode, puis contrôles (identifiants, extension, Sparkle, signature). Signature Developer ID et notarisation si les secrets existent, ad hoc sinon. Publication d’une release `dev-N` et du canal `dev-channel` (appcast). Aucun Xcode sur ton Mac.
+- **Tests à chaque envoi** (`.github/workflows/ci.yml`).
+- **Dans l’extension** (Paramètres › Version et mises à jour) : version et canal, « Rechercher une mise à jour » (relayé à l’app), « Recharger l’extension », **sauvegarde / restauration** complète des données pour la migration unique depuis l’extension temporaire.
+- **Outils** : `tools/dev/sparkle.mjs` (clés, signature, appcast), `tools/dev/publish-appcast.mjs`, `tools/dev/prepare-resources.mjs` (manifest « AI Flow Dev », version croissante).
+- `native/KeepAwakeController.swift` : code Awake partagé par l’app publique et l’app de développement.
+
+### Tests
+- `tests/devops.test.cjs` (5 tests) : signature et refus des archives falsifiées, appcast, identifiants stables, versions croissantes, sauvegarde et restauration.
+- `tests/e2e/update-cycle.cjs` (14 vérifications, Chromium) : installation initiale, publication signée, mise à jour falsifiée refusée, mise à jour, redémarrage avec même identifiant, réglages, historique et points de reprise conservés, fichiers modifiés pris en compte.
+
+### À faire de ton côté (voir docs/DEV-WORKFLOW.md)
+- Connecter GitHub à Claude et créer le dépôt (public), puis ajouter le secret `SPARKLE_ED_PRIVATE_KEY`.
+- Pour zéro manipulation dans Safari : compte Apple Developer (99 €/an) et secrets de signature et de notarisation.
+
+### Non vérifié ici
+- Première compilation macOS dans le cloud, Sparkle dans l’app, signature et notarisation Apple, installation réelle dans Safari.
+
 ## 0.10.0 — Continuité du travail : prévisions fiables, historique enrichi, Awake repensé, Smart Transfer 2.0
 
 ### Corrigé

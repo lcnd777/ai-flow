@@ -1,0 +1,106 @@
+# AI Flow Dev — projet macOS généré par XcodeGen sur la machine de compilation (GitHub Actions, macOS + Xcode).
+# Aucun Xcode n'est nécessaire sur le Mac de l'utilisateur.
+#
+# Identifiants STABLES (ne jamais les changer : Safari rattache les données de l'extension à ces identifiants) :
+#   app de développement      ai.flow.dev            extension  ai.flow.dev.Extension      schéma  aiflow-dev
+#   future app publique       ai.flow.app            extension  ai.flow.app.Extension      schéma  aiflow
+name: AIFlowDev
+options:
+  deploymentTarget:
+    macOS: "12.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "0.0.0"          # remplacé par la CI (version du manifest)
+    CURRENT_PROJECT_VERSION: "1"        # remplacé par la CI (numéro de build croissant)
+    SWIFT_VERSION: "5.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"             # signature ad hoc par défaut ; Developer ID si les secrets existent
+    DEVELOPMENT_TEAM: ""
+    AIFLOW_FEED_URL: "https://github.com/OWNER/REPO/releases/download/dev-channel/appcast.xml"
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.4"
+targets:
+  AIFlowDev:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+      - path: ../native/KeepAwakeController.swift
+    dependencies:
+      - target: AIFlowDevExtension
+        embed: true
+        codeSign: true
+      - package: Sparkle
+    scheme: {}
+    entitlements:
+      path: App/App.entitlements
+      properties:
+        com.apple.security.cs.disable-library-validation: false
+    info:
+      path: build/App-Info.plist
+      properties:
+        CFBundleName: AI Flow Dev
+        CFBundleDisplayName: AI Flow Dev
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: true
+        NSPrincipalClass: NSApplication
+        NSHumanReadableCopyright: AI Flow — canal de développement
+        AIFlowChannel: dev
+        AIFlowURLScheme: aiflow-dev
+        CFBundleURLTypes:
+          - CFBundleURLName: ai.flow.dev
+            CFBundleURLSchemes: [aiflow-dev]
+        SUFeedURL: $(AIFLOW_FEED_URL)
+        SUPublicEDKey: 4fs4bLDoV6tx4Dlw6PN0nSY1b6ytmPScG24QllQiRro=
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 3600
+        SUAllowsAutomaticUpdates: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.flow.dev
+        PRODUCT_NAME: AI Flow Dev
+        GENERATE_INFOPLIST_FILE: NO
+  AIFlowDevExtension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: ../native/SafariWebExtensionHandler.swift
+    entitlements:
+      path: Extension/Extension.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-only: true
+    info:
+      path: build/Extension-Info.plist
+      properties:
+        CFBundleName: AI Flow Dev Extension
+        CFBundleDisplayName: AI Flow Dev
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        AIFlowURLScheme: aiflow-dev
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.Safari.web-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SafariWebExtensionHandler
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.flow.dev.Extension
+        PRODUCT_NAME: AI Flow Dev Extension
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+    postBuildScripts:
+      # Les fichiers de l'extension web (préparés par tools/dev/prepare-resources.mjs) à la racine des Resources de l'appex.
+      - name: Copier l’extension web AI Flow
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          src="$SRCROOT/build/extension"
+          [ -f "$src/manifest.json" ] || { echo "error: lance d'abord node tools/dev/prepare-resources.mjs"; exit 1; }
+          rsync -a "$src/" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/"

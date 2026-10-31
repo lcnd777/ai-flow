@@ -1,9 +1,10 @@
-# AI Flow — Usage Monitor 0.10.0 (bêta)
+# AI Flow — Usage Monitor 0.11.0 (bêta)
 
 **Never lose your flow to an AI limit.**
 
 AI Flow est une extension Safari (Mac, iPhone, iPad), Chrome et Edge. Elle montre d'un coup d'œil quelles IA sont disponibles, prévient avant les limites, aide à passer d'une IA à l'autre sans perdre le contexte et peut relancer une conversation quand le quota se rouvre.
 
+- **Développement sans ZIP ni Xcode** : [docs/DEV-WORKFLOW.md](docs/DEV-WORKFLOW.md) (app AI Flow Dev, mises à jour automatiques).
 - **Installation** : [docs/INSTALLATION.md](docs/INSTALLATION.md). Sans Xcode : Safari (extension temporaire) ou Chrome / Edge. Awake : rattrapage au réveil par défaut, réveil programmé en option.
 - **Ce qui est vraiment mesuré** : [docs/QUOTAS.md](docs/QUOTAS.md)
 - **Confidentialité** : [docs/PRIVACY.md](docs/PRIVACY.md)

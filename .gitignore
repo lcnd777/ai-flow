@@ -1,2 +1,4 @@
 *.zip
 dist/
+macos/build/
+macos/*.xcodeproj/

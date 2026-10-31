@@ -1,6 +1,6 @@
 {
   "name": "ai-flow",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "AI Flow — Usage Monitor (extension Safari / Chrome / Edge)",
   "type": "module",
@@ -8,6 +8,7 @@
     "test": "node --test tests/*.test.cjs",
     "build": "node tools/build.mjs",
     "package": "node tools/build.mjs --zip",
-    "e2e": "node tests/e2e/run.cjs"
+    "e2e": "node tests/e2e/run.cjs",
+    "e2e:update": "node tests/e2e/update-cycle.cjs"
   }
 }

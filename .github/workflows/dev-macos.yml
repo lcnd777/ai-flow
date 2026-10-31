@@ -1,0 +1,102 @@
+# AI Flow Dev : à chaque envoi sur main, compile l'app macOS (Xcode dans le cloud),
+# la signe, la publie et met à jour le flux Sparkle. L'app installée propose alors « Mettre à jour ».
+name: AI Flow Dev (macOS)
+on:
+  push:
+    branches: [main]
+    paths: ['safari/**', 'native/**', 'macos/**', 'tools/dev/**', '.github/workflows/dev-macos.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dev-macos
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+  build:
+    needs: test
+    runs-on: macos-14
+    env:
+      BUILD: ${{ github.run_number }}
+      FEED_URL: https://github.com/${{ github.repository }}/releases/download/dev-channel/appcast.xml
+      REPO_URL: https://github.com/${{ github.repository }}
+      SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+      MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+      MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      NOTARY_KEY_P8_BASE64: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+      NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+      NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Vérifier la clé de mise à jour
+        run: |
+          [ -n "$SPARKLE_ED_PRIVATE_KEY" ] || { echo "::error::Ajoute le secret SPARKLE_ED_PRIVATE_KEY (docs/DEV-WORKFLOW.md)"; exit 1; }
+      - name: Version
+        run: |
+          echo "VERSION=$(node -p "require('./safari/manifest.json').version")" >> "$GITHUB_ENV"
+      - name: Préparer l’extension et le projet Xcode
+        run: |
+          brew install xcodegen
+          node tools/dev/prepare-resources.mjs "$BUILD"
+          cd macos && xcodegen generate
+      - name: Certificat Developer ID (si fourni)
+        if: env.MAC_CERT_P12_BASE64 != ''
+        run: |
+          KC="$RUNNER_TEMP/aiflow.keychain-db"; PASS="$(uuidgen)"
+          echo "$MAC_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$PASS" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$PASS" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MAC_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$PASS" "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          echo "SIGN_IDENTITY=Developer ID Application" >> "$GITHUB_ENV"
+      - name: Compiler
+        run: |
+          xcodebuild -project macos/AIFlowDev.xcodeproj -scheme AIFlowDev -configuration Release \
+            -derivedDataPath build/dd -destination 'generic/platform=macOS' \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" AIFLOW_FEED_URL="$FEED_URL" \
+            CODE_SIGN_IDENTITY="${SIGN_IDENTITY:--}" DEVELOPMENT_TEAM="${APPLE_TEAM_ID}" OTHER_CODE_SIGN_FLAGS="--timestamp" \
+            build | tail -40
+          APP="build/dd/Build/Products/Release/AI Flow Dev.app"
+          echo "APP=$APP" >> "$GITHUB_ENV"
+      - name: Contrôles (identifiants stables, signature, extension)
+        run: |
+          test "$(defaults read "$PWD/$APP/Contents/Info" CFBundleIdentifier)" = "ai.flow.dev"
+          test "$(defaults read "$PWD/$APP/Contents/PlugIns/AI Flow Dev Extension.appex/Contents/Info" CFBundleIdentifier)" = "ai.flow.dev.Extension"
+          test -f "$APP/Contents/PlugIns/AI Flow Dev Extension.appex/Contents/Resources/manifest.json"
+          test -d "$APP/Contents/Frameworks/Sparkle.framework"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+      - name: Notarisation Apple (si fournie)
+        if: env.NOTARY_KEY_P8_BASE64 != '' && env.SIGN_IDENTITY != ''
+        run: |
+          echo "$NOTARY_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
+          xcrun stapler staple "$APP"
+      - name: Archive, signature Sparkle et appcast
+        run: |
+          ZIP="AI-Flow-Dev-$BUILD.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
+          node tools/dev/publish-appcast.mjs "$ZIP" "$BUILD" "$VERSION" "$REPO_URL/releases/download/dev-$BUILD/$ZIP" appcast.xml
+          cp "$ZIP" AI-Flow-Dev.zip
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+      - name: Publier
+        run: |
+          gh release create "dev-$BUILD" "$ZIP" --prerelease --title "AI Flow Dev $VERSION (build $BUILD)" --notes "$(git log -1 --pretty=%B)"
+          gh release view dev-channel >/dev/null 2>&1 || gh release create dev-channel --prerelease --title "AI Flow Dev — canal de mise à jour" --notes "Flux Sparkle de l’app de développement. Installation initiale : AI-Flow-Dev.zip."
+          gh release upload dev-channel appcast.xml AI-Flow-Dev.zip --clobber

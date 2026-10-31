@@ -50,6 +50,11 @@ enum AIFlowNative {
             return status(["ok": opened])
         case "AI_FLOW_AWAKE_STATUS":
             return status(["ok": true])
+        case "AI_FLOW_DEV_UPDATE":
+            // Demande à l'app (Sparkle) de chercher une nouvelle version, sur clic dans l'extension.
+            return status(["ok": open(host: "update", items: [])])
+        case "AI_FLOW_DEV_INFO":
+            return status(["ok": true])
         default:
             return ["ok": false, "error": "type"]
         }
@@ -68,6 +73,8 @@ enum AIFlowNative {
         guard let id = hostBundleID else { return nil }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
     }
+    /// « aiflow » pour l'app publique, « aiflow-dev » pour l'app de développement (clé AIFlowURLScheme de l'Info.plist).
+    static var urlScheme: String { Bundle.main.object(forInfoDictionaryKey: "AIFlowURLScheme") as? String ?? "aiflow" }
     static var appRunning: Bool {
         guard let id = hostBundleID else { return false }
         return !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty
@@ -76,12 +83,17 @@ enum AIFlowNative {
         var out = extra
         out["appInstalled"] = appURL != nil
         out["appRunning"] = appRunning
+        if let url = appURL, let info = Bundle(url: url)?.infoDictionary {
+            out["appVersion"] = info["CFBundleShortVersionString"] as? String ?? ""
+            out["appBuild"] = info["CFBundleVersion"] as? String ?? ""
+            out["channel"] = info["AIFlowChannel"] as? String ?? "public"
+        }
         return out
     }
     /// Ouvre aiflow://<host>?… avec l'app AI Flow, sans la passer au premier plan.
     static func open(host: String, items: [URLQueryItem]) -> Bool {
         var c = URLComponents()
-        c.scheme = "aiflow"
+        c.scheme = urlScheme
         c.host = host
         c.queryItems = items
         guard let url = c.url, let app = appURL else { return false }

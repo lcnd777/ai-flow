@@ -48,7 +48,7 @@ else
 fi
 delegate=$(find "$output_dir" -path '*macOS (App)*' -name AppDelegate.swift | head -n 1)
 if [ -n "$delegate" ]; then
-  cp "$native_dir/AppDelegate.swift" "$delegate"
+  cat "$native_dir/AppDelegate.swift" "$native_dir/KeepAwakeController.swift" > "$delegate"
   echo "✓ App Mac AI Flow (Awake + barre des menus) installée"
 else
   echo "⚠︎ « macOS (App)/AppDelegate.swift » introuvable : copie native/AppDelegate.swift à la main." >&2; warn=1

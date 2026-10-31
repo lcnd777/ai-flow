@@ -247,6 +247,39 @@ async function openUrl(url){
   const t=await api.tabs.create({url:conv.url,active:true,pinned:false});return {tabId:t.id,reused:false};
 }
 
+/* ---------- Développement : version, mise à jour (Sparkle), rechargement, sauvegarde ---------- */
+async function devInfo(){
+  const m=api.runtime.getManifest();
+  const reply=hasNative()?await nativeCall({type:'AI_FLOW_DEV_INFO'}):null;
+  return {version:m.version,versionName:m.version_name||m.version,name:m.name,native:!!reply,channel:reply?.channel||(/dev/i.test(m.name)?'dev':'public'),appVersion:reply?.appVersion||null,appBuild:reply?.appBuild||null};
+}
+async function devCheckUpdate(){
+  const reply=hasNative()?await nativeCall({type:'AI_FLOW_DEV_UPDATE'}):null;
+  if(!reply?.ok)throw Error('La recherche de mise à jour passe par l’app AI Flow Dev : installe-la (docs/DEV-WORKFLOW.md).');
+  return {ok:true};
+}
+// Sauvegarde complète des données locales d'AI Flow (clés ai_flow_*), pour changer d'installation sans rien perdre.
+const DATA_PREFIX='ai_flow_';
+async function exportData(){
+  const all=await api.storage.local.get(null),data={};
+  for(const [k,v] of Object.entries(all))if(k.startsWith(DATA_PREFIX)&&k!==K.capture&&k!==K.seed)data[k]=v;
+  return {format:'ai-flow-backup',schema:1,exportedAt:new Date().toISOString(),version:api.runtime.getManifest().version,data};
+}
+async function importData(backup){
+  if(backup?.format!=='ai-flow-backup'||backup.schema!==1||!backup.data||typeof backup.data!=='object')throw Error('Fichier de sauvegarde AI Flow non reconnu.');
+  const entries=Object.entries(backup.data).filter(([k])=>k.startsWith(DATA_PREFIX)&&k.length<64);
+  if(!entries.length)throw Error('Sauvegarde vide.');
+  if(JSON.stringify(backup.data).length>8e6)throw Error('Sauvegarde trop volumineuse.');
+  const data=Object.fromEntries(entries);
+  // L'état principal est revalidé (aucune valeur non conforme ne passe).
+  if(data[A.KEY])data[A.KEY]=A.clean(data[A.KEY]);
+  if(data[K.history])data[K.history]=A.cleanHistory(data[K.history]);
+  if(data[K.drafts])data[K.drafts]=A.cleanCheckpoints(data[K.drafts]);
+  await api.storage.local.set(data);
+  await restoreResumeAlarms();await badge();
+  return {keys:entries.length};
+}
+
 /* ---------- Awake : maintien éveillé du Mac via l'app AI Flow ---------- */
 const AWAKE_MAX_AHEAD=12*3600000,AWAKE_GRACE=10*60000;
 function desiredAwake(jobs,settings,test,now=Date.now()){
@@ -423,6 +456,11 @@ async function handle(message,sender){
     case 'awakeStatus':return awakeStatus();
     case 'awakeTest':return awakeTest();
     case 'clearHistory':await save(K.history,null);return true;
+    case 'devInfo':return devInfo();
+    case 'devCheckUpdate':return devCheckUpdate();
+    case 'reload':setTimeout(()=>api.runtime.reload(),150);return true;
+    case 'exportData':return exportData();
+    case 'importData':return importData(payload);
     case 'clear':{
       await api.storage.local.set({[K.diag]:{},[K.notify]:null,[ACCOUNT_KEY]:{}});
       await write('clear');await badge();return true;
@@ -437,7 +475,7 @@ async function handle(message,sender){
     default:throw Error('Commande inconnue');
   }
 }
-const DIRECT_OPS=new Set(['openPage','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert']);
+const DIRECT_OPS=new Set(['devInfo','devCheckUpdate','reload','exportData','openPlatform','openUrl','connectionStatuses','awakeStatus','captureConversation','openAndInsert']);
 api.runtime.onMessage.addListener((message,sender,reply)=>{
   if(message?.type!=='AI_FLOW')return false;
   // Ouvertures d'onglets et lectures : immédiates, sans attendre la file des écritures.
@@ -469,4 +507,4 @@ async function catchUp(){
 }
 api.runtime.onStartup?.addListener(()=>serial(async()=>{await install();await catchUp();}));
 serial(install);
-if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,captureConversation,recordInterruptions});
+if(typeof globalThis.__AIFLOW_TEST__==='object')Object.assign(globalThis.__AIFLOW_TEST__,{desiredAwake,authorized,openPage,autoRefresh,refreshPlatform,handle,fireResume,catchUp,exportData,importData,devInfo,captureConversation,recordInterruptions});
