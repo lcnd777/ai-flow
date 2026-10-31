@@ -134,3 +134,7 @@ test('Smart Switch : ne propose jamais la plateforme courante',()=>{
   assert.ok(!sw.available.some(x=>x.platform==='claude'));
   assert.ok(sw.available.some(x=>x.platform==='codex'));
 });
+test('Awake mode Terminal : commande caffeinate calculée jusqu’à l’échéance',()=>{
+  assert.equal(A.caffeinateCommand(NOW+2*H+600000,NOW),'caffeinate -i -t 7800');
+  assert.equal(A.caffeinateCommand(NOW-1,NOW),'','échéance passée : aucune commande');
+});

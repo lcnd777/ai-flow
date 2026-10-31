@@ -1,3 +1,9 @@
+## 0.8.1 — Tout sans Xcode
+
+- **Awake en mode Terminal** : sans l’app Mac (donc sans Xcode), AI Flow calcule la commande macOS `caffeinate -i -t <secondes>` pour la relance programmée (jusqu’à 10 min après), avec un bouton Copier dans la pastille et dans Paramètres. Elle fonctionne aussi avec Chrome et Edge sur Mac. L’état indique « Mode Terminal » au lieu de « Indisponible ».
+- Installation réécrite : l’extension temporaire de Safari (sans Xcode) devient la voie principale ; Xcode reste facultatif.
+- Tests : 40 unitaires, 41 vérifications d’intégration (dont le mode Terminal sur Mac simulé).
+
 ## 0.8.0 — Centre de contrôle multi-IA, Awake intégré, vraies pages Tableau de bord et Paramètres
 
 ### Développé

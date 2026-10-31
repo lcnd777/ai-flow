@@ -1,11 +1,11 @@
-# Validation de la 0.8.0
+# Validation de la 0.8.1
 
 ## Tests exécutés
 
 | Suite | Commande | Résultat |
 |---|---|---|
-| Unitaires et non-régression (Node 22, sans dépendance) | `npm test` | **39 / 39** |
-| Intégration navigateur : extension Chrome/Edge réelle dans Chromium 1.63 (Playwright), sites **simulés** | `xvfb-run -a node tests/e2e/run.cjs` | **39 / 39** |
+| Unitaires et non-régression (Node 22, sans dépendance) | `npm test` | **40 / 40** |
+| Intégration navigateur : extension Chrome/Edge réelle dans Chromium 1.63 (Playwright), sites **simulés** | `xvfb-run -a node tests/e2e/run.cjs` | **41 / 41** |
 
 ### Ce que couvrent les tests unitaires
 - **Cœur** : nettoyage de l'état (refus des valeurs non observées, hors bornes ou d'une autre plateforme), fraîcheur de 15 min, statuts « non mesuré », « partiel » et « limite atteinte ».

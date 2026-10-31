@@ -308,10 +308,12 @@
     if(!ts)return '';const age=now-ts;
     return age>LATE_MS?`Actualisé il y a ${Math.floor(age/60000)} min`:`Actualisé à ${clock(ts)}`;
   }
+  // Sans app Mac : « caffeinate -i » (intégré à macOS) empêche la veille d'inactivité jusqu'à l'échéance.
+  function caffeinateCommand(until,now=Date.now()){const s=Math.ceil((until-now)/1000);return s>0?`caffeinate -i -t ${s}`:'';}
   const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
     pace,autonomy,platformAutonomy,autonomyText,fmtDuration,smartSwitch,cleanHistory,recordHistory,segments,notificationEvents,describeEvents,
-    HANDOFF_FIELDS,buildHandoff,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
+    HANDOFF_FIELDS,buildHandoff,caffeinateCommand,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

@@ -54,10 +54,22 @@
   });
   async function awake(){
     $('awake-state').textContent='Vérification…';$('awake-state').className='muted';
-    try{const s=await A.request('awakeStatus'),t=U.awakeText(s);$('awake-state').textContent=t.text;$('awake-state').className=t.cls;$('awake-test').disabled=!s.enabled||s.supported===false;}
+    try{const s=await A.request('awakeStatus'),t=U.awakeText(s);$('awake-state').textContent=t.text;$('awake-state').className=t.cls;
+      const terminal=s.enabled&&U.isMac()&&(s.supported===false||!s.reachable)&&s.error!=='unsupported-platform';
+      $('awake-test').hidden=terminal;$('awake-test').disabled=!s.enabled||s.supported===false;
+      $('awake-terminal').hidden=!terminal;
+      if(terminal){
+        const cmd=A.caffeinateCommand(s.until);
+        $('awake-cmd').textContent=cmd||'caffeinate -i -t 7200';
+        $('awake-cmd-note').textContent=cmd?`Calculée pour ta prochaine relance : Mac éveillé jusqu’à ${A.dayClock(s.until)}.`:(s.tooFar?'Ta relance est prévue dans plus de 12 h : programme-la plus près ou adapte la durée (en secondes).':'Aucune relance programmée : voici un exemple pour 2 heures. La commande exacte apparaîtra ici après avoir programmé une relance.');
+      }}
     catch(e){$('awake-state').textContent=e.message;}
   }
   $('awake-refresh').onclick=awake;
+  $('awake-copy').onclick=async()=>{
+    try{await navigator.clipboard.writeText($('awake-cmd').textContent);notice('Commande copiée : colle-la dans Terminal (⌘V) puis Entrée.');}
+    catch{const r=document.createRange();r.selectNodeContents($('awake-cmd'));getSelection().removeAllRanges();getSelection().addRange(r);notice('Copie refusée : la commande est sélectionnée, fais ⌘C.');}
+  };
   $('awake-test').onclick=async()=>{
     const b=$('awake-test');b.disabled=true;$('awake-state').textContent='Test en cours…';
     try{const s=await A.request('awakeTest'),t=U.awakeText(s);$('awake-state').textContent=t.text;$('awake-state').className=t.cls;

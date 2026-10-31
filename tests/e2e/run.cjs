@@ -107,6 +107,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   await opt.locator('[data-visible="gemini"]').uncheck();await opt.waitForTimeout(300);
   await opt.locator('[data-move="grok"][data-dir="-1"]').click();await opt.waitForTimeout(300);
   await opt.locator('[data-setting="awakeEnabled"]').check();await opt.waitForTimeout(800);
+  check('Awake hors Mac : indisponible, pas de commande Terminal',/Indisponible sur cet appareil/.test(await opt.locator('#awake-state').innerText())&&await opt.locator('#awake-terminal').isHidden());
   st=await storage('ai_flow_state_v1');
   check('Paramètres : Gemini masquée',st.settings.platformHidden.gemini===true);
   check('Paramètres : ordre modifié',st.settings.platformOrder.indexOf('grok')<st.settings.platformOrder.indexOf('codex'));
@@ -163,6 +164,13 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   const job=jobs&&Object.values(jobs)[0];
   check('Relance programmée à la réouverture + 2 min',!!job&&Math.abs(job.at-(resetAt+120000))<2000,JSON.stringify(jobs));
   w=await widget(pc);await w.click('#toggle');await pc.waitForTimeout(300);await pc.screenshot({path:path.join(shots,'widget-armed.png')});
+  // Mode Terminal (sans app Mac / sans Xcode) : Mac simulé.
+  const macOpt=await ctx.newPage();await macOpt.addInitScript(()=>Object.defineProperty(Navigator.prototype,'platform',{get:()=>'MacIntel'}));
+  await macOpt.setViewportSize({width:1000,height:900});await macOpt.goto(E('options.html'));await macOpt.waitForTimeout(1200);
+  const cmd=await macOpt.locator('#awake-cmd').innerText().catch(()=>'');
+  const expectSec=job?Math.round((job.at+600000-Date.now())/1000):0;
+  check('Awake sans app : commande Terminal calculée pour la relance',await macOpt.locator('#awake-terminal').isVisible()&&/^caffeinate -i -t \d+$/.test(cmd)&&Math.abs(Number(cmd.split(' ').pop())-expectSec)<15,cmd);
+  await macOpt.locator('#awake-terminal').scrollIntoViewIfNeeded();await macOpt.screenshot({path:path.join(shots,'options-awake-terminal.png')});await macOpt.close();
   // Avance l'horloge de la relance (alarme dans 3 s) au lieu d'attendre 3 minutes.
   if(job)await sw.evaluate(id=>chrome.alarms.create('ai-flow-resume:'+id,{when:Date.now()+3000}),job.id);
   claude={five_hour:{utilization:2,resets_at:iso(5*H)},seven_day:{utilization:21,resets_at:iso(70*H)}};

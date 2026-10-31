@@ -231,7 +231,7 @@ async function resumeArm(payload,sender){
   await save(K.resume,jobs);
   await api.alarms.create('ai-flow-resume:'+id,{when:at});
   const awake=await syncKeepAwake(true);
-  return {id,at,awake:{until:awake.until||0,appRunning:awake.appRunning??null,supported:awake.supported!==false}};
+  return {id,at,awake:{until:awake.until||0,appRunning:awake.appRunning??null,supported:awake.supported!==false,reachable:awake.reachable??null}};
 }
 async function resumeCancel(id){
   const jobs=await resumeJobs();if(!jobs[id])return false;

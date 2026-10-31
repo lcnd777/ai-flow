@@ -55,10 +55,10 @@
 
   /* ---------- Relance programmée ---------- */
   const DEFAULT_TEXT='Continue exactement là où tu t’es arrêté.';
-  let resumeData={jobs:{},last:null},formOpen=false,form={time:'',text:DEFAULT_TEXT,keepAwake:true,error:''},dismissed={},autoOpenedFor=null,armedInfo=null;
+  let awakeInfo={},resumeData={jobs:{},last:null},formOpen=false,form={time:'',text:DEFAULT_TEXT,keepAwake:true,error:''},dismissed={},autoOpenedFor=null,armedInfo=null;
   async function loadAux(){
     try{
-      const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.dismiss,K.toast]);
+      const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.dismiss,K.toast,K.awake]);awakeInfo=v[K.awake]||{};
       resumeData={jobs:v[K.resume]||{},last:v[K.resumeLast]||null};dismissed=v[K.dismiss]||{};
       const list=(Array.isArray(v[K.toast])?v[K.toast]:[]).filter(t=>t.ts>=loadedAt-60000&&!seenToasts.has(t.id)&&(sitePlatforms.includes(t.platform)||t.type!=='approaching'));
       if(list.length&&!document.hidden){toast=list.at(-1);for(const t of list)seenToasts.add(t.id);}
@@ -87,18 +87,23 @@
   }
   function awakeLine(job){
     if(!job.keepAwake||!state.settings.awakeEnabled)return '';
-    const a=armedInfo&&armedInfo.id===job.id?armedInfo.awake:null;
-    if(a&&a.supported===false)return ' · Mac éveillé : indisponible ici';
-    if(a&&a.appRunning===false)return ' · Mac éveillé : app AI Flow non lancée';
     if(job.at-Date.now()>12*3600000)return ' · Mac éveillé : relance > 12 h, non maintenu';
+    if(terminalMode(job))return ' · Mac éveillé : lance la commande Terminal ci-dessous';
+    const a=armedInfo&&armedInfo.id===job.id?armedInfo.awake:null;
+    if(a&&a.appRunning===false)return ' · Mac éveillé : app AI Flow non lancée';
     return ' · Mac maintenu éveillé';
+  }
+  const isMac=/Mac/i.test(navigator.platform||navigator.userAgent)&&!(navigator.maxTouchPoints>1);
+  function terminalMode(job){
+    const a=armedInfo&&armedInfo.id===job.id?armedInfo.awake:awakeInfo;
+    return isMac&&job.keepAwake&&state.settings.awakeEnabled&&job.at-Date.now()<=12*3600000&&(a?.supported===false||a?.reachable===false);
   }
   function resumeSection(){
     if(!canResume||(!state.settings.resumePrompt&&!currentJob()))return '';
     if(!formOpen&&limitPrompt())return '';
     if(!conv())return `<div class="resume tiny">Relance après quota : ouvre une conversation pour la programmer.</div>`;
     const job=currentJob();
-    if(job)return `<div class="resume"><div class="row"><span>Relance prévue <b>${esc(A.dayClock(job.at))}</b></span><button id="resume-cancel" class="link" data-id="${esc(job.id)}">Annuler</button></div><div class="tiny">« ${esc(job.message.slice(0,80))}${job.message.length>80?'…':''} »${esc(awakeLine(job))}${job.attempts?` · nouvel essai (${esc(job.status)})`:''}</div></div>`;
+    if(job)return `<div class="resume"><div class="row"><span>Relance prévue <b>${esc(A.dayClock(job.at))}</b></span><button id="resume-cancel" class="link" data-id="${esc(job.id)}">Annuler</button></div><div class="tiny">« ${esc(job.message.slice(0,80))}${job.message.length>80?'…':''} »${esc(awakeLine(job))}${job.attempts?` · nouvel essai (${esc(job.status)})`:''}</div>${terminalMode(job)?`<div class="acts"><button id="awake-copy" class="btn" data-cmd="${esc(A.caffeinateCommand(job.at+A.AWAKE_GRACE))}">Copier la commande Terminal</button></div><div class="tiny" id="awake-copied">Colle-la dans Terminal (⌘V, Entrée) et laisse la fenêtre ouverte.</div>`:''}</div>`;
     const last=resumeData.last&&resumeData.last.url===conv()?`<div class="tiny">Dernière relance : ${esc(resumeData.last.status)} · ${esc(A.dayClock(resumeData.last.at))}</div>`:'';
     if(!formOpen)return `<div class="resume">${last}<button id="resume-open" class="link">Relancer automatiquement à la réouverture…</button></div>`;
     return `<div class="resume resume-form"><div class="tiny">Envoie ce message une seule fois dans cette conversation, à l’heure choisie${site==='claude'?' (si la session Claude est bien rouverte)':''}.</div>
@@ -201,6 +206,11 @@
       if(!Number.isFinite(at)){form.error='Choisis une heure de relance.';render();return;}
       if(!form.text.trim()){form.error='Le message est vide.';render();return;}
       arm(at);
+    });
+    $('awake-copy')?.addEventListener('click',async e=>{
+      const cmd=e.currentTarget.dataset.cmd,info=$('awake-copied');
+      try{await navigator.clipboard.writeText(cmd);info.textContent='Copiée. Ouvre Terminal, colle (⌘V), appuie sur Entrée et laisse la fenêtre ouverte.';}
+      catch{info.textContent='Copie refusée. Tape dans Terminal : '+cmd;}
     });
     $('resume-cancel')?.addEventListener('click',async e=>{try{await send('resumeCancel',{id:e.currentTarget.dataset.id});}catch{}await loadAux();render();});
     $('limit-arm')?.addEventListener('click',e=>{form.keepAwake=true;arm(Number(e.currentTarget.dataset.at));});

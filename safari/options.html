@@ -31,14 +31,19 @@
       <div class="setting"><div><b>Relance après quota</b><span>Quand Claude atteint sa limite dans une conversation, la pastille propose de la relancer à la réouverture. Sur ChatGPT, tu choisis l’heure. Un seul envoi, annulable.</span></div><label class="switch"><input type="checkbox" data-setting="resumePrompt"><span></span></label></div>
       <div class="setting"><div><b>Awake : garder le Mac éveillé</b><span>Empêche la mise en veille automatique jusqu’à 10 min après une relance programmée, puis s’arrête tout seul.</span></div><label class="switch"><input type="checkbox" data-setting="awakeEnabled"><span></span></label></div>
       <div class="kv"><span>État</span><b id="awake-state" class="muted">Vérification…</b></div>
+      <div id="awake-terminal" class="terminal" hidden>
+        <p class="fine">Sans l’app Mac (pas besoin d’Xcode) : macOS sait déjà empêcher la veille avec la commande <code>caffeinate</code>. Copie-la, colle-la dans <b>Terminal</b> et appuie sur Entrée. Laisse la fenêtre ouverte : la commande s’arrête toute seule 10 min après la relance. Pour arrêter avant, ferme la fenêtre (ou ctrl + C).</p>
+        <div class="cmd"><code id="awake-cmd"></code><button type="button" id="awake-copy" class="primary small">Copier</button></div>
+        <p class="fine" id="awake-cmd-note"></p>
+      </div>
       <div class="row-actions"><button type="button" id="awake-test" class="ghost small">Tester (2 min)</button><button type="button" id="awake-refresh" class="ghost small">Revérifier</button></div>
       <details class="explain"><summary>Ce qu’Awake peut et ne peut pas faire</summary>
         <ul>
           <li>Awake empêche la <b>mise en veille automatique</b> (inactivité). L’écran peut s’éteindre et la session se verrouiller : la relance fonctionne quand même si Safari reste ouvert.</li>
           <li>Il <b>ne réveille pas</b> un Mac déjà endormi et n’empêche pas la veille quand tu fermes le capot sur batterie, ni une mise en veille manuelle.</li>
-          <li>Il nécessite <b>Safari sur Mac</b> et l’<b>app AI Flow</b> installée (générée avec <code>prepare-safari.sh</code>). Elle se lance seule en arrière-plan quand une relance est programmée et affiche son état dans la barre des menus.</li>
+          <li>Deux façons de l’utiliser sur Mac : le <b>mode Terminal</b> (aucune installation : une commande à copier, fonctionne aussi avec Chrome et Edge sur Mac), ou l’<b>app AI Flow</b> (automatique, nécessite Xcode via <code>prepare-safari.sh</code>).</li>
           <li>Pour la batterie : seul le Mac reste éveillé, pas l’écran ; limité aux relances prévues dans les 12 h ; mis en pause sous 20 % de batterie hors secteur.</li>
-          <li>Indisponible sur iPhone, iPad, Chrome et Edge.</li>
+          <li>Indisponible sur iPhone, iPad et Windows.</li>
         </ul></details>
     </section>
 

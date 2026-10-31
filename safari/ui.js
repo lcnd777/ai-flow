@@ -64,12 +64,15 @@
       ${unmeasured.length?`<p class="fine">Non mesurées : ${esc(unmeasured.join(', '))}.</p>`:''}
       ${opts.transfer!==false?'<button class="primary small" data-open-page="transfer">Préparer le transfert de contexte</button>':''}</section>`;
   }
+  const isMac=()=>/Mac/i.test(navigator.platform||navigator.userAgent)&&!(navigator.maxTouchPoints>1)&&!/iPhone|iPad/i.test(navigator.userAgent);
   function awakeText(s){
     if(!s)return {text:'Vérification…',cls:'muted'};
     if(!s.enabled)return {text:'Désactivé',cls:'muted'};
-    if(s.supported===false)return {text:'Indisponible : nécessite Safari sur Mac et l’app AI Flow',cls:'warn'};
-    if(s.error==='unsupported-platform')return {text:'Indisponible sur iPhone et iPad',cls:'warn'};
-    if(!s.reachable)return {text:'Indisponible : app AI Flow non installée ou composant natif absent',cls:'warn'};
+    if(s.supported===false||!s.reachable||s.error==='unsupported-platform'){
+      if(s.error==='unsupported-platform'||!isMac())return {text:'Indisponible sur cet appareil (Mac uniquement)',cls:'warn'};
+      if(s.until>Date.now())return {text:`Mode Terminal : lance la commande ci-dessous (jusqu’à ${A.dayClock(s.until)})`,cls:'warn'};
+      return {text:'Mode Terminal (sans app Mac) : la commande apparaîtra à la prochaine relance',cls:'muted'};
+    }
     if(s.until>Date.now())return s.appRunning?{text:`Actif jusqu’à ${A.dayClock(s.until)}`+(s.holding===false?' (en pause : batterie faible)':''),cls:'ok'}:{text:'Indisponible : l’app AI Flow ne s’est pas lancée',cls:'warn'};
     if(s.tooFar)return {text:'Prêt · relance prévue dans plus de 12 h : le Mac pourra se mettre en veille',cls:'muted'};
     return {text:'Prêt · s’activera à la prochaine relance programmée',cls:'ok'};
@@ -103,5 +106,5 @@
     setInterval(refresh,ms);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   }
-  root.AIFlowUI={FAILURES,logo,meter,connection,platformCard,smartSwitchHTML,awakeText,loadExtras,openPage,openPlatform,bindNav,getDrafts,saveDrafts,live,chip};
+  root.AIFlowUI={FAILURES,logo,meter,connection,platformCard,smartSwitchHTML,awakeText,isMac,loadExtras,openPage,openPlatform,bindNav,getDrafts,saveDrafts,live,chip};
 })(window);
