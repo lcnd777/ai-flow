@@ -3,13 +3,14 @@
 name: AI Flow Dev (macOS)
 on:
   push:
-    branches: [main]
-    paths: ['safari/**', 'native/**', 'macos/**', 'tools/dev/**', '.github/workflows/dev-macos.yml']
+    # main : compilation + publication. Branches de travail des agents : compilation de contrôle, jamais publiée.
+    branches: [main, 'claude/**', 'codex/**']
+    paths: ['safari/**', 'native/**', 'macos/**', 'tools/dev/**', 'tools/handoff/**', '.github/workflows/dev-macos.yml']
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: dev-macos
+  group: dev-macos-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   test:
@@ -27,7 +28,8 @@ jobs:
       BUILD: ${{ github.run_number }}
       FEED_URL: https://github.com/${{ github.repository }}/releases/download/dev-channel/appcast.xml
       REPO_URL: https://github.com/${{ github.repository }}
-      SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+      # Clé de publication fournie uniquement sur main : ailleurs, compilation et contrôles sans publication.
+      SPARKLE_ED_PRIVATE_KEY: ${{ github.ref == 'refs/heads/main' && secrets.SPARKLE_ED_PRIVATE_KEY || '' }}
       MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
       MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -90,6 +92,13 @@ jobs:
           "$APP/Contents/MacOS/AI Flow Dev" & PID=$!
           sleep 10
           if kill -0 $PID 2>/dev/null; then echo "Lancement OK"; kill $PID; else echo "::error::L'app s'est fermée au lancement"; wait $PID; exit 1; fi
+          # Dev Continuity : l'app analyse un vrai dépôt (celui-ci) avec Git et le cœur JavaScript embarqué.
+          BEFORE="$(git status --porcelain)"
+          OUT="$("$APP/Contents/MacOS/AI Flow Dev" --handoff-selftest "$PWD")"
+          echo "$OUT" | head -c 1500; echo
+          echo "$OUT" | grep -q '"schema":"ai-flow.handoff/v1"' || { echo "::error::Auto-test Dev Continuity en échec"; exit 1; }
+          echo "$OUT" | grep -q "\"commit\":\"$(git rev-parse HEAD)\"" || { echo "::error::Commit mal relevé par l'app"; exit 1; }
+          test "$BEFORE" = "$(git status --porcelain)" || { echo "::error::L'auto-test a modifié le dépôt"; git status --porcelain; exit 1; }
       - name: Notarisation Apple (si fournie)
         if: env.NOTARY_KEY_P8_BASE64 != '' && env.SIGN_IDENTITY != ''
         run: |

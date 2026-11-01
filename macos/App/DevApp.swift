@@ -3,6 +3,7 @@
 // Identifiants stables et distincts de la future app publique : ai.flow.dev / ai.flow.dev.Extension.
 
 import Cocoa
+import SwiftUI
 import SafariServices
 import ServiceManagement
 import Sparkle
@@ -12,6 +13,11 @@ import UserNotifications
 enum AIFlowDevMain {
     static let delegate = AppDelegate()
     static func main() {
+        // Auto-test Dev Continuity (CI) : « AI Flow Dev --handoff-selftest <dossier> » — lecture seule, puis sortie.
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--handoff-selftest") {
+            exit(HandoffEngine.selfTest(path: i + 1 < args.count ? args[i + 1] : FileManager.default.currentDirectoryPath))
+        }
         let app = NSApplication.shared
         app.delegate = delegate
         app.run()
@@ -89,7 +95,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             open.keyEquivalent = "\r"
             let check = NSButton(title: "Rechercher des mises à jour", target: self, action: #selector(checkForUpdates))
             check.bezelStyle = .rounded
-            let buttons = NSStackView(views: [check, open])
+            let dev = NSButton(title: "Dev Continuity…", target: self, action: #selector(showDevContinuity))
+            dev.bezelStyle = .rounded
+            let buttons = NSStackView(views: [check, open, dev])
             let stack = NSStackView(views: [title, text, buttons])
             stack.orientation = .vertical
             stack.alignment = .leading
@@ -138,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         version.isEnabled = false
         menu.addItem(version)
         menu.addItem(NSMenuItem(title: "Rechercher des mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "u"))
+        menu.addItem(NSMenuItem(title: "Dev Continuity…", action: #selector(showDevContinuity), keyEquivalent: "d"))
         menu.addItem(.separator())
         let state = NSMenuItem(title: awake.statusText, action: nil, keyEquivalent: "")
         state.isEnabled = false
@@ -157,6 +166,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func checkForUpdates() { updater.checkForUpdates(nil) }
+
+    // MARK: Dev Continuity
+
+    private var devWindow: NSWindow?
+    private let devModel = DevContinuityModel()
+    @objc func showDevContinuity() {
+        if devWindow == nil {
+            let w = NSWindow(contentViewController: NSHostingController(rootView: DevContinuityView(model: devModel)))
+            w.title = "Dev Continuity — AI Flow Dev"
+            w.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            w.isReleasedWhenClosed = false
+            w.center()
+            devWindow = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        devWindow?.makeKeyAndOrderFront(nil)
+    }
     @objc private func stopAwake() { awake.set(untilMs: 0) }
     @objc private func showWindowAction() { showWindow() }
     @objc private func openExtensionSettings() {

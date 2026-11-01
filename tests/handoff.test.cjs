@@ -65,3 +65,24 @@ test('--run exécute les vérifications et enregistre le résultat réel',async(
   const h=JSON.parse(fs.readFileSync(path.join(work,'.handoff','latest.json'),'utf8'));
   assert.equal(h.tests[0].exitCode,3);assert.equal(h.tests[0].result,'échec');
 });
+test('point d’entrée de l’app macOS : cœur pur sans Node, même résultat que la CLI, instructions prêtes à coller',async()=>{
+  const vm=require('node:vm');const {work}=repos();
+  fs.writeFileSync(path.join(work,'a.txt'),'v3\n');
+  // Contexte nu, comme JavaScriptCore : aucun require, aucun process, aucun accès fichier.
+  const ctx={};ctx.globalThis=ctx;vm.createContext(ctx);
+  for(const f of ['safari/sync.js','tools/handoff/core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',f),'utf8'),ctx);
+  const H=ctx.AIFlowHandoff,raw={};
+  const g=(...a)=>{try{return execFileSync('git',a,{cwd:work,encoding:'utf8',stdio:['ignore','pipe','ignore']}).replace(/\n$/,'');}catch{return null;}};
+  for(const [k,a] of H.GIT_PHASE1)raw[k]=g(...a);
+  for(const [k,a] of H.gitPhase2(raw))raw[k]=g(...a);
+  const out=JSON.parse(H.prepare(JSON.stringify(raw),'',JSON.stringify({mission:'Finir X',next:['Écrire Y']}),'claude-code','codex','2026-11-01T10:00:00Z'));
+  assert.equal(out.ok,true);
+  assert.equal(out.handoff.publication.level,'local-changes');
+  assert.match(out.markdown,/Passation Claude Code → Codex/);
+  assert.match(out.prompt,/Lis AGENTS\.md[\s\S]*handoff\.mjs verify[\s\S]*d’abord : Écrire Y/);
+  assert.match(out.prompt,/ne sont pas sur GitHub/,'changements non publiés signalés à l’agent cloud');
+  const L=await lib();
+  assert.equal(L.buildHandoff({state:L.readGitState(L.gitRunner(work))}).publication.level,out.handoff.publication.level,'CLI et app : même analyse');
+  assert.equal(JSON.parse(H.prepare('{}','','','x','y')).handoff.publication.level,'unverifiable');
+  assert.equal(JSON.parse(H.prepare('pas du json')).ok,false);
+});
