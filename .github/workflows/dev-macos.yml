@@ -95,7 +95,7 @@ jobs:
           # Dev Continuity : l'app analyse un vrai dépôt (celui-ci) avec Git et le cœur JavaScript embarqué.
           BEFORE="$(git status --porcelain)"
           OUT="$("$APP/Contents/MacOS/AI Flow Dev" --handoff-selftest "$PWD")"
-          echo "$OUT" | head -c 1500; echo
+          printf '%s\n' "${OUT:0:1500}"
           echo "$OUT" | grep -q '"schema":"ai-flow.handoff/v1"' || { echo "::error::Auto-test Dev Continuity en échec"; exit 1; }
           echo "$OUT" | grep -q "\"commit\":\"$(git rev-parse HEAD)\"" || { echo "::error::Commit mal relevé par l'app"; exit 1; }
           test "$BEFORE" = "$(git status --porcelain)" || { echo "::error::L'auto-test a modifié le dépôt"; git status --porcelain; exit 1; }

@@ -134,7 +134,7 @@ final class HandoffEngine {
         guard let out = H.objectForKeyedSubscript("prepare").call(withArguments: [rawJSON, untracked, notesJSON, from, to, iso])?.toString(),
               let obj = try JSONSerialization.jsonObject(with: Data(out.utf8)) as? [String: Any] else { throw HandoffEngineError.script("réponse vide") }
         guard obj["ok"] as? Bool == true, let h = obj["handoff"] as? [String: Any] else { throw HandoffEngineError.script(obj["error"] as? String ?? "erreur inconnue") }
-        let json = String(decoding: try JSONSerialization.data(withJSONObject: h, options: [.prettyPrinted, .sortedKeys]), as: UTF8.self)
+        let json = String(decoding: try JSONSerialization.data(withJSONObject: h, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]), as: UTF8.self)
         return HandoffResult(handoff: h, json: json, markdown: obj["markdown"] as? String ?? "", prompt: obj["prompt"] as? String ?? "", promptInline: obj["promptInline"] as? String ?? "")
     }
 
@@ -166,7 +166,7 @@ final class HandoffEngine {
     static func selfTest(path: String) -> Int32 {
         do {
             let r = try HandoffEngine(folder: URL(fileURLWithPath: path)).prepare(notes: ["mission": "Auto-test Dev Continuity"], from: "claude-code", to: "codex")
-            let compact = String(decoding: try JSONSerialization.data(withJSONObject: r.handoff), as: UTF8.self)
+            let compact = String(decoding: try JSONSerialization.data(withJSONObject: r.handoff, options: [.withoutEscapingSlashes]), as: UTF8.self)
             print(compact)
             return r.available ? 0 : 1
         } catch {
