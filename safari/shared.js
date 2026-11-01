@@ -489,6 +489,41 @@
     const found=['decisions','constraints','done','problems','next','excerpt'].filter(k=>fields[k]).length;
     return {fields,found,total:list.length};
   }
+  /* Transfer Integrity : ce qui part réellement et ce qui ne part pas, à partir des seules données connues
+     (capture, transcription, rubriques, aperçu final). Aucun chiffre estimé ou inventé. */
+  function transferIntegrity({capture=null,transcript=null,fields={},mode='resume',preview='',target='claude',secrets=0}={}){
+    const kept=[],missing=[],n=(x,w)=>`${x} ${w}${x>1?'s':''}`;
+    const filled=k=>typeof fields[k]==='string'&&fields[k].trim();
+    const lines=k=>filled(k)?fields[k].split('\n').filter(l=>l.trim()).length:0;
+    if(capture){
+      const total=capture.messages?.length||0;
+      if(transcript&&transcript.total){
+        kept.push(transcript.omitted?`${transcript.included} messages sur ${total} repris dans l’ordre`:`${n(total,'message')} accessible${total>1?'s':''}, tous repris`);
+        if(transcript.omitted)missing.push(`${n(transcript.omitted,'message')} intermédiaire${transcript.omitted>1?'s':''} omis pour tenir dans la taille choisie`);
+      }else kept.push(`${n(total,'message')} lu${total>1?'s':''} (résumés dans les rubriques ci-dessous)`);
+      if(capture.source==='page')missing.push('Lecture depuis la page affichée : les messages non chargés peuvent manquer');
+      if(capture.dropped)missing.push(`${n(capture.dropped,'message')} ancien${capture.dropped>1?'s':''} non lu${capture.dropped>1?'s':''} (conversation trop longue)`);
+      if(capture.truncated)missing.push(`${n(capture.truncated,'message')} trop long${capture.truncated>1?'s':''} coupé${capture.truncated>1?'s':''} à la lecture`);
+      const att=(capture.messages||[]).flatMap(m=>m.attachments||[]);
+      const imgs=att.filter(a=>/^image$/i.test(a)).length,files=att.filter(a=>!/^image$/i.test(a));
+      if(files.length)missing.push(`Pièce${files.length>1?'s':''} jointe${files.length>1?'s':''} non transférée${files.length>1?'s':''} : ${[...new Set(files)].slice(0,5).join(', ')}${files.length>5?'…':''}`);
+      if(imgs)missing.push(`${n(imgs,'image')} non transférée${imgs>1?'s':''}`);
+    }else missing.push('Aucune conversation récupérée : seul ce que tu as saisi sera transmis');
+    const cut=(String(preview).match(/caractères tronqués/g)||[]).length;
+    if(cut)missing.push(`${n(cut,'message')} tronqué${cut>1?'s':''} dans les échanges joints`);
+    if(mode!=='full'){
+      const d=lines('decisions'),c=lines('constraints');
+      if(d||c)kept.push([d?n(d,'décision'):'',c?n(c,'contrainte'):''].filter(Boolean).join(' et '));
+      if(filled('next'))kept.push('Prochaines étapes');
+      if(filled('problems'))kept.push(`${n(lines('problems'),'problème')} ouvert${lines('problems')>1?'s':''}`);
+      if(filled('excerpt'))kept.push('Éléments indispensables (code, liens)');
+    }else kept.push('Synthèse demandée à l’IA de destination avant de continuer');
+    const masked=(String(preview).match(/\[[^\]]{2,30} masqué\]/g)||[]).length;
+    if(masked)kept.push(`${n(masked,'information sensible')} masquée${masked>1?'s':''}`);
+    const e=estimateTransfer(preview,target);
+    if(e.level!=='ok')missing.push(e.level==='large'?'Message volumineux : la destination peut le convertir en pièce jointe ou le tronquer':'Message trop volumineux pour la destination : il risque d’être refusé ou coupé');
+    return {kept,missing,secrets,level:secrets||e.level==='too-large'?'warn':missing.length?'partial':'ok'};
+  }
   // Taille estimée d'un transfert et adéquation à la destination (ordre de grandeur, ~4 caractères par jeton).
   const DEST_LIMITS={claude:{ok:120000,max:200000},chatgpt:{ok:30000,max:100000}};
   function estimateTransfer(text,target){
@@ -557,5 +592,5 @@
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
     runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,platformConsumption,smartSwitch,switchOffer,notificationEvents,describeEvents,
-    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,cleanCheckpoints,timelineItems,CONTINUITY_RX:RX,splitSentences:sentences,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
+    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,transferIntegrity,cleanCheckpoints,timelineItems,CONTINUITY_RX:RX,splitSentences:sentences,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

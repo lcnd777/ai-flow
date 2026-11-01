@@ -5,7 +5,7 @@
   const HINTS={goal:'Ce que tu cherches à obtenir.',context:'Projet, public, technologies, liens utiles…',decisions:'Ce qui est déjà tranché et ne doit pas être remis en question.',
     constraints:'Délais, ton, format, limites techniques…',done:'Ce qui est terminé.',problems:'Ce qui bloque encore ou reste à corriger.',next:'Les prochaines étapes, dans l’ordre.',excerpt:'Code, chiffres, liens à transmettre tels quels.'};
   const DEST=['claude','chatgpt'];
-  let state=await A.getState(),capture=null,draftId=null,manual=false;
+  let state=await A.getState(),capture=null,draftId=null,manual=false,lastTr=null;
   const name=id=>A.platform(id)?.name||'';
   $('fields').innerHTML=A.HANDOFF_FIELDS.map(([k,label])=>`<label>${esc(label)}<textarea data-field="${k}" rows="${k==='excerpt'?4:3}" placeholder="${esc(HINTS[k])}"></textarea></label>`).join('');
   $('source-platform').innerHTML='<option value="">—</option>'+['claude','chatgpt','codex'].map(id=>`<option value="${id}">${esc(name(id))}</option>`).join('');
@@ -39,10 +39,21 @@
     // Privacy Layer : secrets évidents détectés localement, masquables avant l'envoi.
     const sec=S.findSecrets($('preview').value);
     $('secret-warn').hidden=!sec.length;
+    integrity(sec.length);
     if(sec.length)$('secret-warn').querySelector('span').textContent=`${sec.length} secret${sec.length>1?'s':''} probable${sec.length>1?'s':''} détecté${sec.length>1?'s':''} (${[...new Set(sec.map(x=>x.type))].join(', ')}) : vérifie avant l’envoi.`;
   }
+  // Transfer Integrity : ce qui part / ce qui ne part pas, recalculé à chaque modification de l'aperçu.
+  function integrity(secrets){
+    const r=A.transferIntegrity({capture,transcript:capture?lastTr:null,fields:fields(),mode:capture?mode():'resume',preview:$('preview').value,target:$('target').value,secrets});
+    if(!$('preview').value.trim()){$('integrity').innerHTML='';return;}
+    const li=a=>a.map(x=>`<li>${esc(x)}</li>`).join('');
+    $('integrity').className='integrity '+r.level;
+    $('integrity').innerHTML=`<b>${r.level==='ok'?'Ton transfert est prêt':'Ton transfert est prêt, avec des limites'}</b>
+      <div class="int-cols"><div><small>Transmis</small><ul>${li(r.kept)||'<li>—</li>'}</ul></div>
+      ${r.missing.length?`<div><small>Non transmis ou incertain</small><ul class="miss">${li(r.missing)}</ul></div>`:''}</div>`;
+  }
   function update(){
-    const {text,tr}=compose();
+    const {text,tr}=compose();lastTr=tr||null;
     if(!manual)$('preview').value=text;
     size();
     if(capture&&tr)$('source-info').textContent=`« ${capture.title} » · ${name(capture.platform)} · ${capture.messages.length} messages${tr.omitted?` · ${tr.included} repris, ${tr.omitted} intermédiaires omis pour tenir dans la taille choisie`:' · tous repris'}${capture.source==='page'?' · lus depuis la page affichée (les messages non chargés peuvent manquer)':''}.`;
@@ -144,7 +155,7 @@
     const int=r.url&&list.find(d=>d.kind==='interruption'&&d.url===r.url&&d.status!=='done');
     if(int){r.interrupted=true;r.platform=int.platform;r.resetAt=int.resetAt;r.status=int.status;list=list.filter(d=>d.id!==int.id);}
     draftId=r.id;await U.saveDrafts(A.cleanCheckpoints([r,...list]));
-    if(!silent)$('status').textContent='Point de reprise enregistré sur cet appareil. Retrouve-le dans la fenêtre AI Flow et le tableau de bord.';
+    if(!silent)$('status').textContent='Sauvegardé sur cet appareil. Retrouve-le dans la Flow Timeline (fenêtre AI Flow et tableau de bord).';
     return r;
   }
   $('save').onclick=()=>saveCheckpoint(false);

@@ -227,19 +227,24 @@ async function captureTab(tabId){
   try{const f=await api.scripting.executeScript({target:{tabId},world:'MAIN',func:site==='claude'?R.claudeConversation:R.chatgptConversation});r=f?.[0]?.result;}
   catch{throw Object.assign(Error('Safari n’autorise pas encore AI Flow à lire cet onglet. Autorise le site dans les réglages des extensions.'),{code:'permission'});}
   if(r?.status==='not-found')throw Object.assign(Error('Conversation introuvable : elle a peut-être été supprimée, ou appartient à un autre compte.'),{code:'not-found'});
-  const messages=[];let total=0;
-  for(const m of Array.isArray(r?.messages)?r.messages.slice(-800):[]){
+  // Normalisation : les messages les plus RÉCENTS sont gardés en priorité (≤ 800 messages, ≤ 600 000 caractères) ;
+  // les plus anciens au-delà sont comptés comme omis, jamais ignorés en silence.
+  const valid=[];let truncated=0;
+  for(const m of Array.isArray(r?.messages)?r.messages:[]){
     if((m?.role!=='user'&&m?.role!=='assistant')||typeof m.text!=='string')continue;
     const text=m.text.slice(0,60000);
     const attachments=(Array.isArray(m.attachments)?m.attachments:[]).filter(x=>typeof x==='string').slice(0,20).map(x=>x.slice(0,100));
     if(!text.trim()&&!attachments.length)continue;
-    total+=text.length;if(total>600000)break;
+    if(m.text.length>60000)truncated++;
     const id=typeof m.id==='string'&&/^[\w-]{1,80}$/.test(m.id)?m.id:undefined;
-    messages.push(id?{id,role:m.role,text,attachments}:{role:m.role,text,attachments});
+    valid.push(id?{id,role:m.role,text,attachments}:{role:m.role,text,attachments});
   }
-  if(!messages.length)throw Object.assign(Error('Aucun message lisible dans cet onglet. Sélectionne le texte utile et utilise « Transférer » dans la pastille, ou remplis les champs à la main.'),{code:'empty'});
+  const messages=[];let total=0;
+  for(let i=valid.length-1;i>=0&&messages.length<800;i--){if(total+valid[i].text.length>600000&&messages.length)break;total+=valid[i].text.length;messages.unshift(valid[i]);}
+  const dropped=valid.length-messages.length;
+  if(!messages.length)throw Object.assign(Error('Aucun message lisible dans cet onglet. Sélectionne le texte utile et utilise « Continuer sur … » dans la pastille, ou remplis les champs à la main.'),{code:'empty'});
   const conv=PL.conversationOf(tab.url||'');
-  return {ts:Date.now(),platform:site,url:conv?.url||null,title:cleanTitle(r.title||tab.title),source:r.source==='api'?'api':'page',messages,chars:total,attachments:messages.reduce((n,m)=>n+m.attachments.length,0)};
+  return {ts:Date.now(),platform:site,url:conv?.url||null,title:cleanTitle(r.title||tab.title),source:r.source==='api'?'api':'page',messages,chars:total,truncated,dropped,attachments:messages.reduce((n,m)=>n+m.attachments.length,0)};
 }
 const NEW_CHAT={claude:'https://claude.ai/new',chatgpt:'https://chatgpt.com/'};
 const NOTIFY_LINKS='ai_flow_notify_links_v1',DEST_PENDING='ai_flow_dest_pending_v1';

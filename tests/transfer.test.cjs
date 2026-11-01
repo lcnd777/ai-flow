@@ -167,3 +167,28 @@ test('transfert proposé seulement sur les conversations lisibles (pas Claude Co
   assert.ok(PL.transferable('https://chatgpt.com/g/g-abc/c/xyz'));
   for(const u of ['https://claude.ai/code/session_1','https://claude.ai/new','https://chatgpt.com/codex/tasks/task_e_42','https://chatgpt.com/codex','https://chatgpt.com/'])assert.equal(PL.transferable(u),null,u);
 });
+test('Transfer Integrity : transmis / non transmis calculés uniquement à partir des données connues',()=>{
+  const {AIFlow:A}=core();
+  const capture={source:'page',dropped:3,truncated:1,messages:[{role:'user',text:'a',attachments:['devis.pdf','image']},{role:'assistant',text:'b',attachments:[]}]};
+  const r=A.transferIntegrity({capture,transcript:{total:2,included:2,omitted:0},fields:{decisions:'- On garde X\n- On part sur Y',next:'- tester'},preview:'Texte [clé API masqué]\n[… 12 caractères tronqués …]',target:'claude'});
+  const all=JSON.stringify(r);
+  assert.match(all,/2 messages accessibles, tous repris/);assert.match(all,/2 décisions/);assert.match(all,/Prochaines étapes/);
+  assert.match(all,/1 information sensible masquée/);
+  assert.match(all,/page affichée/);assert.match(all,/3 messages anciens non lus/);assert.match(all,/devis\.pdf/);assert.match(all,/1 image non transférée/);
+  assert.match(all,/1 message tronqué/);assert.equal(r.level,'partial');
+  const none=A.transferIntegrity({fields:{goal:'x'},preview:'x'});
+  assert.match(JSON.stringify(none),/Aucune conversation récupérée/);
+  const big=A.transferIntegrity({capture:{source:'api',messages:[]},preview:'x'.repeat(150000),target:'chatgpt',secrets:1});
+  assert.equal(big.level,'warn');assert.match(JSON.stringify(big),/trop volumineux/);
+});
+test('capture d’une conversation trop longue : les messages les plus récents sont gardés, les anciens comptés',async()=>{
+  const {fakeBrowser,load}=require('./helpers.cjs');
+  const msgs=Array.from({length:30},(_,i)=>({role:i%2?'assistant':'user',text:(i===29?'DERNIER ':'')+'x'.repeat(50000)}));
+  const fb=fakeBrowser({inject:async()=>({status:'ok',source:'api',title:'Long',messages:msgs})});
+  const ctx=load(['platforms.js','shared.js','readers.js','sync.js','vault.js','background.js'],{browser:fb.browser,__AIFLOW_TEST__:{},crypto:globalThis.crypto,TextDecoder});
+  const t=fb.addTab('https://claude.ai/chat/11111111-1111-1111-1111-111111111111');
+  const r=await ctx.__AIFLOW_TEST__.captureConversation(t.id);
+  const cap=fb.store.ai_flow_capture_v1;
+  assert.ok(cap.messages.at(-1).text.startsWith('DERNIER'),'le message le plus récent est conservé');
+  assert.equal(cap.messages.length+cap.dropped,30);assert.ok(cap.dropped>0);assert.ok(r.count<30);
+});

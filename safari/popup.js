@@ -36,7 +36,7 @@
     for(const d of items.slice(0,3)){
       const act=d.ready&&d.url?`<button class="primary small" data-resume="${esc(d.id)}">Reprendre</button>`
         :d.destUrl?`<button class="ghost small" data-url="${esc(d.destUrl)}">Continuer</button>`
-        :`<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>${d.interrupted?'Transférer':'Ouvrir'}</button>`;
+        :`<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({draft:d.id}))}'>${d.interrupted?'Continuer ailleurs':'Ouvrir'}</button>`;
       // Flow Recovery : avant de reprendre, proposer les avancées faites entre-temps sur l'autre IA.
       const f=d.url&&U.flowOf(flows,d.url),other=f&&f.ends.find(e=>e.url!==d.url);
       const sync=other?`<button class="ghost small" data-open-page="transfer" data-query='${esc(JSON.stringify({sync:f.id,from:other.url,auto:'1'}))}' title="Synchroniser les avancées de ${esc(A.platform(other.platform).name)}">Avancées ${esc(A.platform(other.platform).name)}</button>`:'';

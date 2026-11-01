@@ -90,7 +90,7 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
   check('Pastille ChatGPT : Codex chiffré, sans bloc « non mesuré »',/Codex · 41 % utilisés|Pas d’alerte/.test(wg)&&!/n’expose pas les limites de messages/.test(wg),wg.slice(0,300));
 
   // 3. Navigation du popup : vrais onglets, non épinglés.
-  for(const [label,file] of [['Paramètres','options.html'],['Tableau de bord','dashboard.html'],['Transférer','transfer.html']]){
+  for(const [label,file] of [['Paramètres','options.html'],['Tableau de bord','dashboard.html'],['Continuer ailleurs','transfer.html']]){
     const p2=await ctx.newPage();await p2.setViewportSize({width:460,height:600});await p2.goto(E('popup.html'));await p2.waitForTimeout(400);
     await p2.getByRole('button',{name:label,exact:true}).click();await pop.waitForTimeout(800);
     const t=(await tabsInfo()).find(x=>x.url.startsWith(E(file)));
@@ -236,6 +236,8 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
       /prêt avant vendredi/.test(await tr.locator('[data-field="constraints"]').inputValue())&&
       /bouton Payer ne fonctionne pas sur Safari/.test(await tr.locator('[data-field="problems"]').inputValue()));
     check('Pièce jointe signalée comme non transférée',/devis\.pdf/.test(await tr.locator('#attach-note').innerText())&&/\[Pièce jointe non transférée : devis\.pdf\]/.test(await tr.locator('#preview').inputValue()));
+    const integ=await tr.locator('#integrity').innerText().catch(()=>'');
+    check('Transfer Integrity : récapitulatif transmis / non transmis avant l’envoi',/Ton transfert est prêt/.test(integ)&&/3 messages accessibles/.test(integ)&&/devis\.pdf/.test(integ)&&/Prochaines étapes/.test(integ),integ);
     check('Taille estimée du transfert affichée',/caractères \(~[\d  ]+ jetons\)/.test(await tr.locator('#count').innerText()));
     const prev=await tr.locator('#preview').inputValue();
     check('Transfert : objectif pré-rempli, derniers échanges dans l’ordre et par rôle',/## Objectif initial\nObjectif : refaire la page tarifs/.test(prev)&&/## Derniers échanges/.test(prev)&&prev.indexOf('**Moi :**\nObjectif')<prev.indexOf('**Claude :**\nProposition')&&prev.indexOf('Proposition')<prev.lastIndexOf('Écris maintenant la FAQ'),prev.slice(0,500));

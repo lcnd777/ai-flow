@@ -45,13 +45,14 @@
         <textarea id="preview" spellcheck="true" aria-label="Message de reprise modifiable" placeholder="Récupère une conversation depuis la fenêtre AI Flow ou remplis au moins un champ."></textarea>
         <p class="fine"><span id="count">0</span> · retire les informations sensibles avant l’envoi.</p>
         <p id="size-warn" class="fine" role="status"></p>
+        <section id="integrity" class="integrity" aria-live="polite"></section>
         <p id="secret-warn" class="fine warn" hidden><span></span> <button type="button" id="mask-secrets" class="ghost small">Masquer</button></p>
         <label class="mini-check"><input type="checkbox" id="auto-insert" checked> Insérer automatiquement dans la zone de saisie (sans l’envoyer)</label>
         <label class="mini-check" id="link-row" hidden><input type="checkbox" id="link-flow"> Lier ces conversations pour synchroniser les prochaines avancées</label>
         <div class="row-actions">
           <button type="button" id="go" class="primary">Ouvrir et insérer</button>
           <button type="button" id="copy" class="ghost">Copier</button>
-          <button type="button" id="save" class="ghost">Enregistrer le point de reprise</button>
+          <button type="button" id="save" class="ghost">Sauvegarder pour plus tard</button>
           <button type="button" id="reset" class="ghost">Effacer</button>
         </div>
         <p id="status" class="fine" role="status"></p>

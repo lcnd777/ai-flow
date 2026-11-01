@@ -265,3 +265,12 @@ label.switch input:focus-visible+span{outline:2px solid var(--acc);outline-offse
 .consumption-total{display:inline-block;margin:8px 22px 0 0}
 .tip-platform{display:inline-block;margin-top:6px}
 .tip-platform i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+
+/* ---------- Transfer Integrity ---------- */
+.integrity:empty{display:none}
+.integrity{border:1px solid var(--edge);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--panel2);font-size:12.5px}
+.integrity.partial,.integrity.warn{border-color:color-mix(in srgb,var(--warn) 45%,var(--edge))}
+.integrity b{display:block;margin-bottom:4px}
+.int-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}.int-cols small{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.integrity ul{margin:4px 0 0;padding-left:16px}.integrity li{margin:2px 0}.integrity ul.miss li{color:var(--warn)}
+@media(max-width:620px){.int-cols{grid-template-columns:1fr}}
