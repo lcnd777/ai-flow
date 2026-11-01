@@ -489,6 +489,32 @@
     const found=['decisions','constraints','done','problems','next','excerpt'].filter(k=>fields[k]).length;
     return {fields,found,total:list.length};
   }
+  /* Quota Sentinel : état de la COLLECTE d'une plateforme (distinct de son quota). Textes courts, sans code technique.
+     conn = {tabOpen, diag:{status,checkedAt,fails,lastOkAt,accountChangedAt}, disabled}. */
+  const SENTINEL_KIND={login:'login','injection-failed':'permission','scripting-unavailable':'permission','wrong-origin':'permission',
+    network:'network',timeout:'network',http:'unavailable','rate-limit':'unavailable','invalid-json':'unrecognized','no-figures':'unrecognized',
+    'invalid-result':'unrecognized','org-ambiguous':'unrecognized','no-result':'pending'};
+  function collectionHealth(state,pid,conn={},now=Date.now()){
+    const p=PL.get(pid),st=platformStatus(state,pid,now),d=conn.diag||null;
+    const ago=t=>{const m=Math.max(1,Math.round((now-t)/60000));return m<60?`il y a ${m} min`:m<1440?`il y a ${Math.floor(m/60)} h ${String(m%60).padStart(2,'0')}`:'il y a plus d’un jour';};
+    const seen=Math.max(0,...Object.entries(state.metrics||{}).filter(([id])=>METRICS[id]?.platform===pid).map(([,m])=>m.observedAt||0));
+    const last=seen?` · dernier relevé ${ago(seen)}`:'';
+    const R=(code,text,cls,action=null)=>({code,text,cls,action});
+    if(p?.support==='none')return R('unmeasured','Quotas non exposés : non mesuré','muted','open');
+    if(conn.disabled)return R('disabled','Mise à jour automatique désactivée','muted');
+    if(d?.accountChangedAt&&now-d.accountChangedAt<10*60000)return R('account','Compte changé : relevés du nouveau compte uniquement','warn');
+    if(st.fresh.length)return now-st.updatedAt>LATE_MS?R('late',`Actualisé ${ago(st.updatedAt)}`,'late'):R('ok',updatedText(st.updatedAt,now)+(st.partial?' · lecture partielle':''),'ok');
+    const kind=d&&!['ok','partial'].includes(d.status)?SENTINEL_KIND[d.status]||'unrecognized':null;
+    if(kind==='login')return R('login','Connexion à vérifier : connecte-toi à '+p.name,'warn','open');
+    if(!conn.tabOpen)return R('no-tab',seen?`Dernier relevé ${ago(seen)} · ouvre ${p.name} pour actualiser`:`Ouvre ${p.name} dans un onglet pour actualiser`,'muted','open');
+    if(kind==='permission')return R('permission','Autorise AI Flow sur '+p.name+' (réglages de l’extension)','warn','open');
+    if(kind==='network')return R('network','Réseau indisponible · nouvel essai automatique'+last,'warn');
+    if(kind==='unavailable')return R('unavailable','Lecture temporairement indisponible · nouvel essai automatique'+last,'warn');
+    if(kind==='unrecognized')return R('unrecognized','Réponse de '+p.name+' non reconnue'+(d.fails>=3?' · format peut-être modifié':'')+last,'warn');
+    // Onglet ouvert mais aucun essai récent : collecte inactive (Safari peut suspendre l'arrière-plan).
+    if(!d||now-(d.checkedAt||0)>10*60000)return R('inactive','Collecte en pause'+last+' · « Actualiser » pour relancer','warn','refresh');
+    return R('pending','Lecture en cours…'+last,'muted');
+  }
   /* Transfer Integrity : ce qui part réellement et ce qui ne part pas, à partir des seules données connues
      (capture, transcription, rubriques, aperçu final). Aucun chiffre estimé ou inventé. */
   function transferIntegrity({capture=null,transcript=null,fields={},mode='resume',preview='',target='claude',secrets=0}={}){
@@ -592,5 +618,5 @@
   root.AIFlow={KEY,KEYS,METRICS,PLATFORMS:PL.PLATFORMS,platform:PL.get,api,THRESHOLDS:{WARN,CRIT,LIMIT,APPROACH},FRESH_MS,LATE_MS,
     clean,defaults,reduce,getState,request,saveSettings,sanitizeReadings,isStale,level,metricIds,platformStatus,visiblePlatforms,
     runway,platformRunway,runwayText,runwayWorthShowing,windowMs,fmtDuration,cleanHistory,recordHistory,consumption,platformConsumption,smartSwitch,switchOffer,notificationEvents,describeEvents,
-    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,transferIntegrity,cleanCheckpoints,timelineItems,CONTINUITY_RX:RX,splitSentences:sentences,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
+    HANDOFF_FIELDS,buildHandoff,buildTranscript,prefillFromMessages,extractContinuity,estimateTransfer,transferIntegrity,collectionHealth,cleanCheckpoints,timelineItems,CONTINUITY_RX:RX,splitSentences:sentences,caffeinateCommand,pmsetCommand,AWAKE_MODES,AWAKE_GRACE:10*60000,formatReset,updatedText,clock,dayClock,escapeHTML,cleanOrder};
 })(typeof window!=='undefined'?window:globalThis);

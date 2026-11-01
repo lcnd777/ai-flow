@@ -17,17 +17,8 @@
       ${reset||(!stale&&m.detail)?`<div class="meter-meta"><span>${esc(m?.detail||'')}</span><span>${esc(reset)}</span></div>`:''}</div>`;
   }
   // Pourquoi une plateforme n'a pas de chiffre : explication courte et action utile.
-  function connection(state,pid,conn,now=Date.now()){
-    const p=A.platform(pid),st=A.platformStatus(state,pid,now),c=conn?.[pid]||{};
-    if(p.support==='none')return {text:'Quotas non exposés : non mesuré',cls:'muted',action:'open'};
-    if(c.disabled)return {text:'Mise à jour automatique désactivée',cls:'muted',action:null};
-    if(st.fresh.length)return {text:A.updatedText(st.updatedAt,now)+(st.partial?' · lecture partielle':''),cls:now-st.updatedAt>A.LATE_MS?'late':'ok',action:null};
-    const d=c.diag;
-    if(d?.status==='login')return {text:`Connecte-toi à ${p.name} dans Safari`,cls:'warn',action:'open'};
-    if(c.tabOpen&&d&&!['ok','partial'].includes(d.status)&&FAILURES[d.status])return {text:'Indisponible : '+FAILURES[d.status],cls:'warn',action:'open'};
-    if(c.tabOpen)return {text:'Lecture en cours…',cls:'muted',action:null};
-    return {text:`Ouvre ${p.name} dans un onglet pour actualiser`,cls:'muted',action:'open'};
-  }
+  // Quota Sentinel : un seul diagnostic de collecte pour la fenêtre, le tableau de bord et la pastille.
+  function connection(state,pid,conn,now=Date.now()){return A.collectionHealth(state,pid,conn?.[pid]||{},now);}
   const LEVEL_LABEL={critical:'Limite proche',warning:'À surveiller',healthy:'Disponible',unknown:'Indisponible',unmeasured:'Non mesuré'};
   const RADAR={available:['healthy','Disponible'],near:['warning','Proche de la limite'],reached:['critical','Limite atteinte'],'reset-soon':['warning','Reset imminent'],stale:['unknown','Données périmées'],unknown:['unknown','Indisponible'],unmeasured:['unknown','Non mesuré']};
   function chip(st){const [cls,label]=RADAR[st.radar]||RADAR.unknown;return `<span class="chip ${cls}">${label}</span>`;}
@@ -43,7 +34,7 @@
     const body=p.support==='none'
       ?`<p class="note">${esc(p.note)}</p>`
       :ids.map(id=>meter(state,id)).join('')+(autoTxt?`<p class="estimate${risky?' risky':''}" title="Calculée sur cet appareil à partir de tes relevés : ce n’est pas une donnée officielle.">${esc(autoTxt)}${['risk','risk-uncertain','safe'].includes(shown.kind)?' <em>Estimation</em>':''}</p>`:'');
-    const action=c.action==='open'?`<button class="ghost small" data-open-platform="${pid}">Ouvrir ↗</button>`:'';
+    const action=c.action==='open'?`<button class="ghost small" data-open-platform="${pid}">Ouvrir ↗</button>`:c.action==='refresh'?`<button class="ghost small" data-refresh-now>Actualiser</button>`:'';
     return `<article class="pcard lvl-${st.limitReached?'critical':st.level}" data-platform="${pid}">
       <header>${logo(pid)}<div class="pname"><b>${esc(p.name)}</b>${tag}</div>${chip(st)}</header>
       ${body}
@@ -108,6 +99,8 @@
   function bindNav(rootEl){
     for(const b of rootEl.querySelectorAll('[data-open-page]'))if(!b.dataset.bound){b.dataset.bound=1;b.addEventListener('click',e=>{e.preventDefault();openPage(b.dataset.openPage,b.dataset.query?JSON.parse(b.dataset.query):undefined);});}
     for(const b of rootEl.querySelectorAll('[data-open-platform]'))if(!b.dataset.bound){b.dataset.bound=1;b.addEventListener('click',e=>{e.preventDefault();openPlatform(b.dataset.openPlatform);});}
+    // Relance de la collecte depuis les onglets déjà ouverts (aucun onglet ouvert ni rechargé).
+    for(const b of rootEl.querySelectorAll('[data-refresh-now]'))if(!b.dataset.bound){b.dataset.bound=1;b.addEventListener('click',async e=>{e.preventDefault();b.disabled=true;b.textContent='Actualisation…';try{await A.request('refresh',null,{timeout:20000});}catch{}b.disabled=false;b.textContent='Actualiser';});}
   }
   // Smart Context Sync : Flows (conversations liées), lus via l'arrière-plan (décisions déchiffrées en mémoire seulement).
   async function loadFlows(){try{return await A.request('flows',null,{timeout:6000});}catch{return {flows:[],quarantined:0,encryption:false};}}

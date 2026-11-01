@@ -89,24 +89,26 @@ async function readPlatform(pid,tab){
     return v;
   }catch{return {status:'injection-failed'};}
 }
-async function saveDiag(pid,result){
-  // Aucune réponse brute, aucun identifiant de compte, cookie ou jeton.
-  const all=await load(K.diag,{});
-  all[pid]={status:String(result.status).slice(0,40),httpStatus:Number.isInteger(result.httpStatus)?result.httpStatus:null,checkedAt:Date.now(),readings:result.readings?.length||0};
+async function saveDiag(pid,result,{good=false,accountChanged=false}={}){
+  // Aucune réponse brute, aucun identifiant de compte, cookie ou jeton. Quota Sentinel : échecs consécutifs et dernier succès.
+  const all=await load(K.diag,{}),prev=all[pid]||{},now=Date.now();
+  all[pid]={status:String(result.status).slice(0,40),httpStatus:Number.isInteger(result.httpStatus)?result.httpStatus:null,checkedAt:now,readings:result.readings?.length||0,
+    fails:good?0:Math.min(99,(prev.fails||0)+1),lastOkAt:good?now:(prev.lastOkAt||null),accountChangedAt:accountChanged?now:(prev.accountChangedAt||null)};
   await save(K.diag,all);
 }
 async function refreshPlatform(pid,tab){
   const result=await readPlatform(pid,tab);
   const readings=A.sanitizeReadings(pid,result.readings);
   const good=(result.status==='ok'||result.status==='partial')&&readings.length>0;
-  await saveDiag(pid,good?result:{...result,status:result.status==='ok'||result.status==='partial'?'invalid-result':result.status});
-  if(good){
+  let accountChanged=false;
+  if(good&&typeof result.account==='string'){
     // Changement de compte : ne jamais mélanger les relevés de deux comptes.
-    if(typeof result.account==='string'){
-      const accounts=await load(ACCOUNT_KEY,{});
-      if(accounts[pid]&&accounts[pid]!==result.account)await write('clearPlatform',{platform:pid});
-      if(accounts[pid]!==result.account){accounts[pid]=result.account;await save(ACCOUNT_KEY,accounts);}
-    }
+    const accounts=await load(ACCOUNT_KEY,{});
+    if(accounts[pid]&&accounts[pid]!==result.account){accountChanged=true;await write('clearPlatform',{platform:pid});}
+    if(accounts[pid]!==result.account){accounts[pid]=result.account;await save(ACCOUNT_KEY,accounts);}
+  }
+  await saveDiag(pid,good?result:{...result,status:result.status==='ok'||result.status==='partial'?'invalid-result':result.status},{good,accountChanged});
+  if(good){
     const {state}=await write('metrics',{platform:pid,readings});
     await save(K.history,A.recordHistory(await load(K.history,null),readings));
     await notify(state);
@@ -120,7 +122,9 @@ async function refreshPlatform(pid,tab){
 }
 async function autoRefresh(pids,force=false){
   const saved=await load(K.auto,{}),last={...(saved.last||{})},disabled=saved.disabled||{},now=Date.now();
-  const todo=pids.filter(p=>PL.get(p)?.reader&&!disabled[p]&&(force||now-(last[p]||0)>=AUTO_MIN_GAP));
+  // Après plusieurs échecs consécutifs, espacement progressif des essais (2, 4, 8… jusqu'à 30 min) : pas de requêtes inutiles.
+  const diag=await load(K.diag,{}),gap=p=>{const f=diag[p]?.fails||0;return f>=3?Math.min(30*60000,AUTO_MIN_GAP*2**(f-2)):AUTO_MIN_GAP;};
+  const todo=pids.filter(p=>PL.get(p)?.reader&&!disabled[p]&&(force||now-(last[p]||0)>=gap(p)));
   if(!todo.length)return {skipped:true};
   const tabs=await allTabs(),out={};
   for(const pid of todo){

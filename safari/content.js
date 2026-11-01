@@ -55,10 +55,10 @@
 
   /* ---------- Relance programmée ---------- */
   const DEFAULT_TEXT='Continue exactement là où tu t’es arrêté.';
-  let checkpoints=[],flows=[],awakeInfo={},resumeData={jobs:{},last:null},formOpen=false,form={time:'',text:DEFAULT_TEXT,keepAwake:true,error:''},dismissed={},autoOpenedFor=null,armedInfo=null;
+  let checkpoints=[],flows=[],diag={},awakeInfo={},resumeData={jobs:{},last:null},formOpen=false,form={time:'',text:DEFAULT_TEXT,keepAwake:true,error:''},dismissed={},autoOpenedFor=null,armedInfo=null;
   async function loadAux(){
     try{
-      const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.dismiss,K.toast,K.awake,K.drafts,K.flows]);awakeInfo=v[K.awake]||{};checkpoints=Array.isArray(v[K.drafts])?v[K.drafts]:[];flows=Array.isArray(v[K.flows]?.flows)?v[K.flows].flows:[];
+      const v=await A.api.storage.local.get([K.resume,K.resumeLast,K.dismiss,K.toast,K.awake,K.drafts,K.flows,K.diag]);awakeInfo=v[K.awake]||{};diag=v[K.diag]||{};checkpoints=Array.isArray(v[K.drafts])?v[K.drafts]:[];flows=Array.isArray(v[K.flows]?.flows)?v[K.flows].flows:[];
       resumeData={jobs:v[K.resume]||{},last:v[K.resumeLast]||null};dismissed=v[K.dismiss]||{};
       const list=(Array.isArray(v[K.toast])?v[K.toast]:[]).filter(t=>t.ts>=loadedAt-60000&&!seenToasts.has(t.id)&&(sitePlatforms.includes(t.platform)||t.type!=='approaching'));
       if(list.length&&!document.hidden){toast=list.at(-1);for(const t of list)seenToasts.add(t.id);}
@@ -186,7 +186,12 @@
     let label;
     if(lim)label='Quota atteint';
     else if(st.level==='unmeasured')label='Non mesuré';
-    else if(st.level==='unknown')label=Object.keys(state.metrics).some(id=>A.METRICS[id].platform===main)?'Relevé ancien':'Quota indisponible';
+    else if(st.level==='unknown'){
+      // Quota Sentinel : même diagnostic que la fenêtre AI Flow (onglet ouvert par définition).
+      const h=A.collectionHealth(state,main,{tabOpen:true,diag:diag[main]});
+      label={login:'Connexion à vérifier',permission:'Autorisation requise',network:'Lecture indisponible',unavailable:'Lecture indisponible',unrecognized:'Réponse non reconnue',inactive:'Collecte en pause',account:'Compte changé'}[h.code]
+        ||(Object.keys(state.metrics).some(id=>A.METRICS[id].platform===main)?'Relevé ancien':'Quota indisponible');
+    }
     else if(hide)label=st.partial?'Quotas partiels':'Pas d’alerte';
     else label=`${sitePlatforms.length>1?name(main)+' · ':''}${Math.round(st.worst)} % utilisés`;
     return {level:lim?'critical':st.level,label:label+(job?` · ${hhmm(job.at)}`:'')};

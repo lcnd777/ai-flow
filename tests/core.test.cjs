@@ -123,3 +123,32 @@ test('Smart Switch : visible dès qu’une autre plateforme est disponible, disc
   assert.equal(A.switchOffer(s,now,'claude').mode,null,'Claude 98 % et Codex 100 % : aucune alternative, pas de Smart Switch');
   assert.equal(A.switchOffer(s,now,null).mode,null);
 });
+test('Quota Sentinel : chaque situation de collecte a son propre état, jamais confondu avec 0 %',()=>{
+  const {AIFlow:A}=require('./helpers.cjs').core();const now=Date.now(),M=60000;
+  const st=(age)=>A.clean({metrics:{'claude.session':{percent:30,source:'observed',observedAt:now-age,resetAt:now+3*3600000},'claude.weekly':{percent:20,source:'observed',observedAt:now-age,resetAt:now+90*3600000}}});
+  const h=(s,conn)=>A.collectionHealth(s,'claude',conn,now);
+  assert.equal(h(st(M),{tabOpen:true,diag:{status:'ok',checkedAt:now}}).code,'ok');
+  assert.equal(h(st(8*M),{tabOpen:true,diag:{status:'ok',checkedAt:now}}).code,'late');
+  const old=h(st(24*M),{tabOpen:false});assert.equal(old.code,'no-tab');assert.match(old.text,/Dernier relevé il y a 24 min/);
+  const empty=A.clean({});
+  assert.equal(h(empty,{tabOpen:true,diag:{status:'login',checkedAt:now}}).code,'login');
+  assert.equal(h(empty,{tabOpen:true,diag:{status:'injection-failed',checkedAt:now}}).code,'permission');
+  assert.equal(h(empty,{tabOpen:true,diag:{status:'network',checkedAt:now}}).code,'network');
+  assert.equal(h(empty,{tabOpen:true,diag:{status:'http',httpStatus:503,checkedAt:now}}).code,'unavailable');
+  const unk=h(empty,{tabOpen:true,diag:{status:'invalid-json',checkedAt:now,fails:4}});assert.equal(unk.code,'unrecognized');assert.match(unk.text,/format peut-être modifié/);
+  assert.equal(h(empty,{tabOpen:true,diag:{status:'ok',checkedAt:now-20*M}}).code,'inactive','onglet ouvert mais plus aucun essai : collecte en pause');
+  assert.equal(h(empty,{tabOpen:true,diag:{status:'ok',checkedAt:now,accountChangedAt:now-M}}).code,'account');
+  for(const c of ['login','permission','network','unavailable','unrecognized','inactive'])assert.ok(!/HTTP|\d{3}\b|Error/.test(h(empty,{tabOpen:true,diag:{status:{login:'login',permission:'injection-failed',network:'network',unavailable:'http',unrecognized:'invalid-json',inactive:'ok'}[c],httpStatus:401,checkedAt:c==='inactive'?0:now}}).text),'aucun code technique affiché');
+});
+test('Quota Sentinel : essais espacés après des échecs répétés, compteur remis à zéro au succès',async()=>{
+  const {fakeBrowser,load}=require('./helpers.cjs');let fail=true,calls=0;
+  const fb=fakeBrowser({inject:async()=>{calls++;return fail?{status:'network'}:{status:'ok',readings:[{id:'claude.session',percent:10,resetAt:Date.now()+3600000},{id:'claude.weekly',percent:5,resetAt:Date.now()+90*3600000}],account:'org1'};}});
+  const T=load(['platforms.js','shared.js','readers.js','sync.js','vault.js','background.js'],{browser:fb.browser,__AIFLOW_TEST__:{},crypto:globalThis.crypto,TextDecoder}).__AIFLOW_TEST__;
+  fb.addTab('https://claude.ai/chat/x',{active:true});
+  for(let i=0;i<3;i++)await T.autoRefresh(['claude'],true);
+  assert.equal(fb.store.ai_flow_diagnostics_v1.claude.fails,3);
+  const k=fb.store.ai_flow_auto_refresh_v1;k.last.claude=Date.now()-90000;fb.store.ai_flow_auto_refresh_v1=k;
+  const before=calls;await T.autoRefresh(['claude']);assert.equal(calls,before,'3 échecs : pas de nouvel essai avant 2 min');
+  fail=false;await T.autoRefresh(['claude'],true);
+  assert.equal(fb.store.ai_flow_diagnostics_v1.claude.fails,0);assert.ok(fb.store.ai_flow_diagnostics_v1.claude.lastOkAt);
+});
