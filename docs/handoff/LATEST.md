@@ -1,14 +1,14 @@
 # Passation Claude Code → Codex
 
-> Généré par AI Flow Git Handoff (ai-flow.handoff/v1) le 2026-10-31T23:39:18.862Z.
+> Généré par AI Flow Git Handoff (ai-flow.handoff/v1) le 2026-11-01T11:39:25.234Z.
 > **Git est la source de vérité.** Ce document résume ; il ne prouve pas que le code existe. Vérifie avec :
 > `node tools/handoff/handoff.mjs verify`
 
 ## Projet
 - Dépôt : https://github.com/lcnd777/ai-flow
 - Branche : `main` (suit `origin/main`)
-- Commit : `492cbea67edc19889867056c00ad6e283db98b48` — 0.14.0 : Git Handoff v1 (Claude Code ↔ Codex), actions de continuité clarifiées
-- Environnement : Session Claude Code cloud (Linux), Node + Chromium Playwright disponibles ; pas de Safari ni de sessions authentifiées.
+- Commit : `e36018eee71522199453f4908451cbe2dae875ac` — 0.15.0 : Dev Continuity sur Mac, Transfer Integrity, Quota Sentinel, recette
+- Environnement : Session Claude Code cloud (Linux) : Node, Chromium Playwright ; macOS uniquement via GitHub Actions (macos-15). Pas de Safari ni de comptes authentifiés.
 
 ## État de publication
 **Publié : le dépôt distant contient exactement ce commit.**
@@ -17,38 +17,40 @@ Modifications locales non commitées :
 - Aucune
 
 ## Mission en cours
-Mission « AI Flow — vision produit complète » : fiabiliser P0, clarifier la continuité, livrer Dev Continuity (Git Handoff v1), préparer P2 sans surdévelopper.
+Mission V0.15.0 : continuité fiable (transfert, synchronisation), Transfer Integrity, Quota Sentinel, Dev Continuity accessible depuis l’app Mac.
 
 ## Travail terminé (déclaratif — à vérifier dans Git)
-- 0.14.0 publiée : Git Handoff v1 (tools/handoff, tests/handoff.test.cjs), AGENTS.md, CLAUDE.md, docs/DEV-CONTINUITY.md
-- Libellés de continuité : Continuer sur X / Sauvegarder pour plus tard / Synchroniser les avancées (popup, pastille, page de sauvegarde)
-- PR #2 fermée (contenu déjà dans main)
-- 0.13.x : Smart Switch (alternative disponible uniquement), fenêtre 460×600, graphique multi-plateformes (Codex), fiabilité Smart Context Sync (Codex)
+- 0.15.0 publiée (build 19, canal Sparkle dev) depuis main e36018e
+- Dev Continuity macOS : macos/App/DevContinuity.swift (menu ⚡ › Dev Continuity…), cœur partagé tools/handoff/core.js exécuté par JavaScriptCore, auto-test --handoff-selftest en CI
+- Transfer Integrity : A.transferIntegrity (shared.js) + encadré #integrity dans transfer.html/js
+- Conversations longues : captureTab garde les messages récents, compte dropped/truncated
+- Quota Sentinel : A.collectionHealth (shared.js), diag fails/lastOkAt/accountChangedAt (background.js saveDiag), backoff autoRefresh, bouton Actualiser (ui.js data-refresh-now), pastille
+- Intitulés de continuité harmonisés ; e2e ChatGPT → Claude ; test restauration sauvegarde sans clé
+- CI : branches claude/** et codex/** compilées sans publication (clé Sparkle seulement sur main)
 
 ## Travail non terminé
-- Quota Sentinel : diagnostics existants (connexion, relevé ancien) mais pas de détection dédiée « collecte inactive / réponse non reconnue » visible discrètement
-- Transfer Integrity : signalements existants (pièces jointes, taille, secrets, messages omis) ; pas encore de récapitulatif unique avant envoi
-- Intégration macOS de Git Handoff (choix d’un dossier dans l’app AI Flow Dev)
-- Flow Spaces, AI Match, Decision Vault étendu : documentés seulement (docs/DEV-CONTINUITY.md §5-6)
+- Recette humaine docs/RECETTE-0.15.md (Safari réel, comptes réels, panneau Dev Continuity à la main)
+- Smart Context Sync dans la vue de synchronisation : pas encore d’encadré d’intégrité unifié (liste d’avertissements existante)
 
 ## Décisions techniques et contraintes
-- Git est la source de vérité ; la passation ne fait que des lectures Git, jamais de commit/push automatique
-- Pas de quotas dans la barre de menus tant que la communication extension → app n’est pas démontrée
-- Smart Switch affiché seulement si une autre plateforme a une capacité confirmée
-- Aucune nouvelle page principale par fonctionnalité
+- Git = source de vérité ; l’app ne fait que des lectures Git (liste fermée côté Swift) ; aucune écriture dans le projet sauf option explicite, jamais de commit/push
+- Passation conservée dans ~/Library/Application Support/AI Flow Dev/Handoffs ; instructions copiées incluent la passation complète
+- Une seule source de diagnostic de collecte (collectionHealth) pour toutes les interfaces
+- Pas de quotas dans la barre de menus ; pas de Flow Spaces / AI Match / Orchestrator pour l’instant
+- Les points de reprise restent en clair (documenté), les décisions de Flow chiffrées
 
 ## Vérifications
-- `npm test` → réussi (# skipped 0 | # todo 0 | # duration_ms 3162.703716)
+- `npm test` → réussi (# skipped 0 | # todo 0 | # duration_ms 3161.772842)
 
 ## Problèmes connus
-- Aucune validation sur Safari réel ni sur comptes Claude/ChatGPT authentifiés (formats d’API reproduits)
-- Le test e2e de l’infobulle dépendait de l’heure : corrigé (survol de la dernière tranche mesurée)
+- Aucune validation Safari réelle ni sur sessions Claude/ChatGPT authentifiées
+- Git peut manquer sur le Mac de l’utilisateur : l’app propose xcode-select --install
 
 ## Prochaines actions
-1. Vérifier avec l’utilisateur sur Safari Mac : libellés de continuité, Smart Switch, synchronisation réelle Claude ↔ ChatGPT
-2. Quota Sentinel : statut discret par plateforme (collecte inactive, session expirée, réponse non reconnue) à partir de ai_flow_diagnostics_v1
-3. Transfer Integrity : récapitulatif « ce qui part / ce qui ne part pas » au-dessus du bouton d’envoi
-4. Intégration Git Handoff dans l’app macOS (dossier choisi explicitement)
+1. Lire le retour de recette de l’utilisateur (docs/RECETTE-0.15.md) et corriger
+2. Encadré d’intégrité dans la vue « Synchroniser les avancées » (réutiliser transferIntegrity)
+3. Publication assistée (commit + push explicitement validés) depuis le panneau Dev Continuity
+4. Tests d’interface du panneau Dev Continuity (UI) si un runner macOS interactif devient disponible
 
 ## Pour Codex
 Codex : lis AGENTS.md, puis lance la vérification ci-dessous avant toute modification. Si tes crédits sont limités, commite et pousse après chaque étape et régénère cette passation.
