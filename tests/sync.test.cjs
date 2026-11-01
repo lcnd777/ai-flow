@@ -313,3 +313,19 @@ test('reprise après interruption : une insertion déjà en attente est revalid�
   await call('syncState',{flowId:flow.id,entryId:other.p.entryId,state:'confirmed'});
   assert.equal(JSON.stringify(env.fb.store),before);
 });
+test('sauvegarde restaurée sur une autre installation (sans la clé) : Flow conservé, décisions jamais remises à zéro, confirmation refusée',async()=>{
+  const env=setup();const flow=await linkedFlow(env);
+  env.convs[GP]=[{id:'g1',role:'user',text:'On garde SQLite pour la base de données.'}];
+  const s=await syncOnce(env,flow.id,GP);await env.call('syncState',{flowId:flow.id,entryId:s.p.entryId,state:'confirmed'});
+  const backup=await env.call('exportData');
+  assert.ok(!JSON.stringify(backup.data.ai_flow_flows_v1).includes('SQLite'),'les décisions du Flow restent chiffrées dans la sauvegarde');
+  // Nouvelle installation : autre clé (aucune clé d'origine).
+  const fresh=setup();fresh.ctx.__AIFLOW_VAULT_MEMORY__.key=null;
+  await fresh.call('importData',backup);
+  const sealedBefore=JSON.stringify(fresh.fb.store.ai_flow_flows_v1.flows[0].sealed);
+  const l=(await fresh.call('flows')).flows[0];
+  assert.equal(l.id,flow.id);assert.equal(l.locked,true);
+  fresh.fb.addTab(GP);fresh.convs[GP]=[{id:'g1',role:'user',text:'On garde SQLite pour la base de données.'},{id:'g2',role:'user',text:'On part sur Vercel.'}];
+  await assert.rejects(syncOnce(fresh,flow.id,GP),/illisibles/,'préparation refusée sur un Flow verrouillé');
+  assert.equal(JSON.stringify(fresh.fb.store.ai_flow_flows_v1.flows[0].sealed),sealedBefore,'données chiffrées d’origine intactes');
+});

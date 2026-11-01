@@ -88,3 +88,10 @@ Sans app Mac, Safari ne répond jamais à un appel natif, ce que Chromium ne rep
 - Chromium (sites simulés) : 85/85 avec les nouveaux libellés.
 - Passation réelle générée sur ce dépôt (`docs/handoff/LATEST.md`) et vérifiée avec `verify`.
 - Non vérifié : Safari réel, sessions authentifiées, reprise effective par Codex à partir de cette passation.
+
+## Ajouts 0.15.0
+
+- Tests unitaires : 134/134 (Transfer Integrity, conversation trop longue, Quota Sentinel ×2, cœur Git Handoff exécuté sans Node comme dans l’app, restauration de sauvegarde sans clé).
+- Chromium, sites simulés : 89/89 (dont ChatGPT → Claude et l’encadré d’intégrité).
+- **macOS réel (GitHub Actions, macos-15)** : compilation, lancement 10 s, et auto-test Dev Continuity (`--handoff-selftest`) : l’app a relevé le bon commit et la bonne branche et n’a pas modifié le dépôt.
+- Non vérifié : interface du panneau Dev Continuity utilisée à la main, Safari réel, comptes authentifiés → `docs/RECETTE-0.15.md`.

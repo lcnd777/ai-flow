@@ -1,3 +1,22 @@
+## 0.15.0 — Continuité fiable et Dev Continuity sur Mac
+
+### Dev Continuity dans l’app Mac
+- ⚡ › **Dev Continuity…** : choisir un projet Git, voir dépôt, branche, dernier commit et changements non publiés, choisir Codex ou Claude Code, **préparer la reprise**, copier les instructions (passation complète incluse) et ouvrir l’agent. Sans Terminal ni Node.
+- Même cœur que la CLI (`tools/handoff/core.js`, exécuté par JavaScriptCore), Git en lecture seule (liste fermée), aucune modification du projet sauf option explicite (sans commit). Passations conservées dans `~/Library/Application Support/AI Flow Dev/Handoffs/`.
+- Auto-test de l’app sur un vrai Mac à chaque compilation ; compilation de contrôle (non publiée) des branches `claude/**` et `codex/**`.
+
+### Transfer Integrity
+- Encadré « Ton transfert est prêt » dans l’aperçu : **Transmis** (messages repris, décisions, contraintes, prochaines étapes, informations sensibles masquées) / **Non transmis ou incertain** (messages omis, lecture partielle, pièces jointes, images, messages tronqués, taille excessive). Uniquement des données réellement connues.
+- Correction : sur une conversation très longue, la lecture gardait les messages les plus anciens et perdait les plus récents. Les plus récents sont désormais prioritaires, les anciens omis sont comptés et signalés.
+
+### Quota Sentinel
+- Diagnostic unique de la collecte, identique dans la fenêtre, le tableau de bord et la pastille : actualisé, dernier relevé il y a…, onglet absent, connexion à vérifier, autorisation requise, réseau, lecture temporairement indisponible, réponse non reconnue, compte changé, **collecte en pause** (onglet ouvert mais plus aucun relevé, bouton « Actualiser »). Jamais de code technique ni de 0 % en cas d’échec.
+- Essais espacés après des échecs répétés (2 → 30 min), remis à zéro au premier succès.
+
+### Continuité
+- Derniers intitulés harmonisés : « Continuer ailleurs », « Sauvegarder pour plus tard », « Ouvrir / continuer ailleurs ».
+- Test navigateur du sens ChatGPT → Claude ; test de restauration d’une sauvegarde sans clé (Flow conservé, décisions jamais remises à zéro).
+
 ## 0.14.0 — Dev Continuity (Git Handoff v1) et parcours de continuité clarifiés
 
 ### Dev Continuity

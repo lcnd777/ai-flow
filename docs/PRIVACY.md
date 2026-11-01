@@ -17,5 +17,5 @@
 - **App Mac** : elle reçoit l’heure de fin du maintien éveillé, et le texte des notifications. Aucun contenu de conversation. Le lien local `aiflow://` ou `aiflow-dev://` ne sort pas du Mac.
 - **Pièces jointes** : seuls leurs noms sont lus (pour te signaler qu’elles ne sont pas transférées) ; leur contenu n’est jamais récupéré.
 - **Secrets** : les clés API, jetons, clés privées et mots de passe évidents sont détectés localement et masqués par défaut avant un transfert ou une synchronisation.
-- **Chiffrement** : le stockage local du navigateur n’est pas chiffré par lui-même ; seuls les contenus de Smart Context Sync cités ci-dessus le sont, par AI Flow.
+- **Chiffrement** : le stockage local du navigateur n’est pas chiffré par lui-même ; seuls les contenus de Smart Context Sync cités ci-dessus le sont, par AI Flow. Après une synchronisation confirmée, les décisions validées sont aussi recopiées dans le point de reprise du Flow, qui, comme tous les points de reprise, est conservé **en clair** sur l’appareil et dans les sauvegardes exportées.
 - **Effacement** : Paramètres › Données (relevés, historique). Les reprises et les conversations liées (« Dissocier », « Supprimer ») se suppriment depuis le tableau de bord. Désinstaller l'extension efface tout.

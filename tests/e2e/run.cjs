@@ -360,6 +360,23 @@ const composer=`<div class="ProseMirror" contenteditable="true" style="border:1p
     check('Tableau de bord : conversation liée, dernière synchronisation, décisions validées',/Synchronisé/.test(flowsTxt)&&/décision/.test(flowsTxt)&&/Dissocier/.test(flowsTxt),flowsTxt.slice(0,300));
     await dash2.close();
   }
+  // 7 quater. Sens ChatGPT → Claude : même parcours depuis la pastille ChatGPT.
+  {
+    gptConvs['vers-claude']=[{role:'user',text:'Objectif : écrire la doc API. Il faut que ce soit en anglais.'},{role:'assistant',text:'Proposition : OpenAPI 3.1. On part sur Redoc pour le rendu.'}];
+    const pv=await ctx.newPage();await pv.goto('https://chatgpt.com/c/vers-claude');await pv.waitForTimeout(2500);
+    let wv=await widget(pv);if(/class="panel hidden/.test(wv.html)){await wv.click('#toggle');wv=await widget(pv);}
+    check('ChatGPT → Claude : « Continuer sur Claude » dans la pastille ChatGPT',/Continuer sur Claude/.test(text(wv.html)));
+    await wv.click('#transfer');await pv.waitForTimeout(3000);
+    const tv=ctx.pages().find(p=>p.url().includes('transfer.html')&&p.url().includes('to=claude'));
+    if(tv){
+      await tv.waitForTimeout(600);
+      const info=await tv.locator('#source-info').innerText().catch(()=>'');
+      check('ChatGPT → Claude : conversation récupérée, destination Claude, décision extraite',/2 messages/.test(info)&&await tv.locator('#target').inputValue()==='claude'&&/Redoc/.test(await tv.locator('[data-field="decisions"]').inputValue()),info);
+      check('ChatGPT → Claude : récapitulatif d’intégrité et bouton « Ouvrir Claude »',/Ton transfert est prêt/.test(await tv.locator('#integrity').innerText())&&/Ouvrir Claude/.test(await tv.locator('#go').innerText()));
+      await tv.close();
+    }else check('ChatGPT → Claude : page de transfert ouverte',false,ctx.pages().map(p=>p.url()).join(' | '));
+    await pv.close();
+  }
   const pop2=await ctx.newPage();await pop2.setViewportSize({width:460,height:600});await pop2.goto(E('popup.html'));await pop2.waitForTimeout(1200);
   check('Popup : points de reprise et travail interrompu accessibles',/point(s)? de reprise/i.test(await pop2.locator('body').innerText()));
   await pop2.screenshot({path:path.join(shots,'popup-continuity.png')});

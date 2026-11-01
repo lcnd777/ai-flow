@@ -21,6 +21,21 @@ Parcours de bout en bout (testé, `tests/handoff.test.cjs`) :
 2. Codex lit `AGENTS.md` → `docs/handoff/LATEST.md` → `verify` → reprend directement les « Prochaines actions ».
 3. Codex s’arrête → `create --from codex --to claude-code` → push → Claude Code (`CLAUDE.md` → `AGENTS.md`) reprend.
 
+### Depuis l’app Mac (sans Terminal) — 0.15.0
+Icône ⚡ › **Dev Continuity…** (ou bouton dans la fenêtre d’accueil d’AI Flow Dev) :
+1. **Choisir un projet…** : dossier d’un clone Git sur le Mac (mémorisé).
+2. L’app affiche dépôt, branche, dernier commit et l’état (publié / changements locaux / commits non poussés), avec un avertissement si un agent cloud ne pourra pas voir ces changements.
+3. **Continuer avec** Codex ou Claude Code, mission et prochaines actions (facultatives).
+4. **Préparer la reprise avec …** : passation conservée dans `~/Library/Application Support/AI Flow Dev/Handoffs/` (le projet n’est pas modifié ; option « Enregistrer aussi dans le projet (docs/handoff/, sans commit) »).
+5. **Copier les instructions** (message prêt à coller, passation complète incluse) puis **Ouvrir Codex / Claude Code**.
+
+Technique : l’app exécute uniquement des commandes Git de lecture (liste fermée, contrôlée côté Swift) et le **même cœur** `tools/handoff/core.js` (+ `safari/sync.js` pour les secrets) via JavaScriptCore : Node n’est pas nécessaire sur le Mac. Aucune commande ne provient de l’extension ou d’une page web. Vérifié en CI sur un vrai Mac (`--handoff-selftest` : l’app analyse le dépôt de compilation et le laisse inchangé).
+
+Contraintes :
+- **Git requis** : Homebrew (`/opt/homebrew/bin/git`) ou outils en ligne de commande d’Apple ; sinon l’app propose « Installer les outils Git d’Apple » (`xcode-select --install`, installateur officiel).
+- L’app n’est pas sandboxée (nécessaire pour lancer Git sur un dossier choisi) ; une version Mac App Store exigerait un accès par signet de sécurité et un Git embarqué.
+- Un agent **cloud** (Codex, Claude Code web) ne voit que ce qui est publié sur GitHub : l’app le signale, sans jamais commiter ni pousser à ta place.
+
 ## 2. Format `ai-flow.handoff/v1`
 
 ```
@@ -69,7 +84,7 @@ Règle d’intégration d’un nouveau fournisseur (Gemini, Grok, Perplexity, Cu
 
 ## 6. Étapes suivantes (P2)
 
-- **Intégration macOS** : bouton « Préparer la passation » dans l’app AI Flow Dev, sur un dossier choisi par l’utilisateur (accès explicite), réutilisant ce module.
+- **Publication assistée** (opération distincte, explicitement validée) : proposer commit + push depuis le panneau quand des changements locaux bloquent un agent cloud.
 - **AI Match / Adaptive Routing** : recommandations fondées sur des capacités déclarées + quotas mesurés + résultats observés dans les passations (`tests[]`), jamais sur un classement arbitraire.
 - **Cross-Agent Review** : une passation `--to codex --mission "Revue du commit X"` suffit déjà comme base ; une commande dédiée pourra pré-remplir le diff et les tests.
 - **Flow Spaces** : un espace = références (conversations, dépôt, passations, Flows) ; le schéma `ai_flow_flows_v1` (v1) restera intact, l’espace les référencera.
